@@ -22,7 +22,7 @@ def MD_recall_precision_f1(gold_spans, pred_spans):
 
 if __name__ == "__main__":
     outputs = []
-    with jsonlines.open("test.english.128.jsonlines") as reader:
+    with jsonlines.open("data/test.output.english.512.jsonlines") as reader:
         for line in reader:
             outputs.append(line)
 
@@ -50,7 +50,7 @@ if __name__ == "__main__":
             for mention in cluster:
                 cluster_text.append(convert_mention(output, mention))
                 stats['gold_cluster_spans'].append(tuple(mention))
-            stats['gold_cluster_spans'].append(cluster_text)
+            stats['gold_cluster_text'].append(cluster_text)
 
         # Top Spans
         stats['pred_mention_text'] = []
@@ -72,5 +72,5 @@ if __name__ == "__main__":
         print("{}: r={}, p={}, f1={}".format(measure, avg_recall, avg_precision, avg_f1))
 
     # Write to file
-    with jsonlines.open('scored.test.output.jsonlines', mode='w') as w:
+    with jsonlines.open('data/scored.test.output.jsonlines', mode='w') as w:
         w.write(scored_outputs)
