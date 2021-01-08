@@ -20,7 +20,10 @@ def MD_recall_precision_f1(gold_spans, pred_spans):
     else:
         precision = len(intersect) / len(pred_set)
     recall = len(intersect) / len(gold_set)
-    f1 = (2*precision*recall) / (precision + recall)
+    if precision + recall == 0:
+        f1 = 0.0
+    else:
+        f1 = (2*precision*recall) / (precision + recall)
     return {'precision': precision, 'recall': recall, 'f1': f1}
 
 
