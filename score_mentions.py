@@ -14,7 +14,11 @@ def MD_recall_precision_f1(gold_spans, pred_spans):
     gold_set = set(gold_spans)
     pred_set = set(pred_spans)
     intersect = gold_set.intersection(pred_set)
-    precision = len(intersect) / len(pred_set)
+
+    if len(pred_set) == 0:
+        precision = 0.0
+    else:
+        precision = len(intersect) / len(pred_set)
     recall = len(intersect) / len(gold_set)
     f1 = (2*precision*recall) / (precision + recall)
     return {'precision': precision, 'recall': recall, 'f1': f1}
@@ -28,6 +32,9 @@ if __name__ == "__main__":
 
     scored_outputs = []
     for output in outputs:
+        if not output['clusters']:
+            continue
+
         stats = {}
         comb_text = [word for sentence in output['sentences'] for word in sentence]
         stats['comb_text'] = comb_text
