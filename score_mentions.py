@@ -78,7 +78,7 @@ if __name__ == "__main__":
     for measure in ['cluster_scores', 'span_scores']:
         avg_recall = np.mean([x[measure]['recall'] for x in scored_outputs])
         avg_precision = np.mean([x[measure]['precision'] for x in scored_outputs])
-        avg_f1 = [x[measure]['f1'] for x in scored_outputs]
+        avg_f1 = np.mean([x[measure]['f1'] for x in scored_outputs])
         print("{}: r={}, p={}, f1={}".format(measure, avg_recall, avg_precision, avg_f1))
 
     # Write to file
