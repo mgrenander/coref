@@ -13,7 +13,7 @@ def convert_bert_word(word):
     elif converted_word == '-RRB-':
         return ')'
     else:
-        return converted_word
+        return converted_word.strip()
 
 
 def adjust_cluster_indices(clusters, sent_start, sent_end):
