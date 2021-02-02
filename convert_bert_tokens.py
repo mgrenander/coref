@@ -16,15 +16,17 @@ def convert_bert_word(word):
         return converted_word
 
 
-def adjust_cluster_indices(clusters, sent_start, sent_end):
+def adjust_cluster_indices(clusters, subtoken_map, sent_start, sent_end):
     """
     Adjust cluster indices to reflect their position within an individual sentence.
     """
     adjusted_clusters = []
     for cluster in clusters:
         for span in cluster:
-            if span[0] > sent_start and span[1] < sent_end:
-                adjusted_clusters.append((span[0] - sent_start, span[1] - sent_start))
+            if span[0] >= sent_start and span[1] <= sent_end:
+                adjusted_start = subtoken_map[span[0]] - subtoken_map[sent_start]
+                adjusted_end = subtoken_map[span[1]] - subtoken_map[sent_start]
+                adjusted_clusters.append((adjusted_start, adjusted_end))
     return adjusted_clusters
 
 
@@ -49,7 +51,7 @@ if __name__ == "__main__":
                 sent_so_far.append(convert_bert_word(''.join(word_so_far)))
                 word_so_far = []
 
-                mapped_outputs.append({'words': sent_so_far, 'spans': adjust_cluster_indices(clusters, sentence_start_idx, i-1)})
+                mapped_outputs.append({'words': sent_so_far, 'spans': adjust_cluster_indices(clusters, subtoken_map, sentence_start_idx, i-1)})
                 sent_so_far = []
                 sentence_start_idx = i
             elif i != 0 and subtoken_map[i-1] != subtoken_map[i]:  # New word
