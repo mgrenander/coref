@@ -52,8 +52,7 @@ if __name__ == "__main__":
                 mapped_outputs.append({'words': sent_so_far, 'spans': adjust_cluster_indices(clusters, sentence_start_idx, i-1)})
                 sent_so_far = []
                 sentence_start_idx = i
-
-            if i != 0 and subtoken_map[i-1] != subtoken_map[i]:  # New word
+            elif i != 0 and subtoken_map[i-1] != subtoken_map[i]:  # New word
                 sent_so_far.append(convert_bert_word(''.join(word_so_far)))
                 word_so_far = []
 
