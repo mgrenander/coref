@@ -53,8 +53,8 @@ if __name__ == "__main__":
             if i != 0 and subtoken_map[i-1] != subtoken_map[i]:  # New word
                 sent_so_far.append(convert_bert_word(''.join(word_so_far)))
                 word_so_far = []
-            else:
-                word_so_far.append(subword)
+
+            word_so_far.append(subword)
 
     with jsonlines.open('data/{}.adjust_span_sents.jsonlines'.format(dataset), mode='w') as w:
         w.write(mapped_outputs)
