@@ -13,7 +13,7 @@ def convert_bert_word(word):
     elif converted_word == '-RRB-':
         return ')'
     else:
-        return converted_word.strip()
+        return converted_word
 
 
 def adjust_cluster_indices(clusters, sent_start, sent_end):
@@ -64,4 +64,4 @@ if __name__ == "__main__":
 
     with open('data/{}.raw_tokens.sentences'.format(dataset), mode='w') as f:
         for output in mapped_outputs:
-            f.write(' '.join(output['words']) + '\n')
+            f.write(' '.join(output['words']).strip() + '\n')
