@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
     with jsonlines.open('data/{}.adjust_span_sents.jsonlines'.format(dataset), mode='w') as w:
         for output in mapped_outputs:
-            w.write(str(output) + '\n')
+            w.write(output)
 
     with open('data/{}.raw_tokens.sentences'.format(dataset), mode='w') as f:
         for output in mapped_outputs:
