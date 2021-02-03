@@ -7,13 +7,7 @@ def convert_bert_word(word):
     """
     Convert bert token to regular word. Convert -LRB- and -RRB- tokens to regular parentheses
     """
-    converted_word = re.sub("##|\[SEP\]|\[CLS\]", "", word)
-    if converted_word == '-LRB-':
-        return '('
-    elif converted_word == '-RRB-':
-        return ')'
-    else:
-        return converted_word
+    return re.sub("##|\[SEP\]|\[CLS\]", "", word)
 
 
 def adjust_cluster_indices(clusters, subtoken_map, sent_start, sent_end):
