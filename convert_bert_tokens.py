@@ -58,6 +58,10 @@ if __name__ == "__main__":
         for output in mapped_outputs:
             w.write(output)
 
+    with open('data/{}.spans'.format(dataset), mode='w') as w:
+        for output in mapped_outputs:
+            w.write(" ".join([idx for span in output['spans'] for idx in span]) + '\n')
+
     with open('data/{}.raw_tokens.sentences'.format(dataset), mode='w') as f:
         for output in mapped_outputs:
             f.write(' '.join(output['words']).strip() + '\n')
