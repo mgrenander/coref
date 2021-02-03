@@ -55,7 +55,8 @@ if __name__ == "__main__":
             word_so_far.append(subword)
 
     with jsonlines.open('data/{}.adjust_span_sents.jsonlines'.format(dataset), mode='w') as w:
-        w.write(mapped_outputs)
+        for output in mapped_outputs:
+            w.write(str(output) + '\n')
 
     with open('data/{}.raw_tokens.sentences'.format(dataset), mode='w') as f:
         for output in mapped_outputs:
