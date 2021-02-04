@@ -13,7 +13,7 @@ if __name__ == "__main__":
     pred_spans = []
     with open("data/parser_spans_preds/test.{}.preds".format(int(sys.argv[1])), 'r') as f:
         for line in f:
-            if not line.strip():
+            if line.strip():
                 pred_spans.append(set(eval(line.strip()[5:-1])))
             else:
                 pred_spans.append(set())
