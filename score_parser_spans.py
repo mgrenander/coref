@@ -3,15 +3,17 @@ import sys
 
 
 if __name__ == "__main__":
+    dataset = 'dev'
+
     # Load gold spans
     gold_spans = []
-    with jsonlines.open("data/test.adjust_span_sents.jsonlines") as reader:
+    with jsonlines.open("data/{}.adjust_span_sents.jsonlines".format(dataset)) as reader:
         for line in reader:
             gold_spans.append(set([tuple(x) for x in line['spans']]))
 
     # Load pred spans
     pred_spans = []
-    with open("data/parser_spans_preds/test.{}.preds".format(int(sys.argv[1])), 'r') as f:
+    with open("data/{}_preds/{}.{}.preds".format(dataset, dataset, int(sys.argv[1])), 'r') as f:
         for line in f:
             if line.strip():
                 pred_spans.append(set(eval(line.strip()[5:-1])))
