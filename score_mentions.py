@@ -51,7 +51,14 @@ if __name__ == "__main__":
         # comb_text = [word for sentence in output['sentences'] for word in sentence]
         # stats['comb_text'] = comb_text
         gold_set = set() if not output['clusters'] else set([tuple(span) for cluster in output['clusters'] for span in cluster])
-        preds_set = set() if not output[pred_key] else set([tuple(span) for cluster in output[pred_key] for span in cluster])
+
+        if pred_key == 'predicted_clusters':
+            preds_set = set() if not output[pred_key] else set([tuple(span) for cluster in output[pred_key] for span in cluster])
+        elif pred_key == 'top_spans':
+            preds_set = set() if not output[pred_key] else set([tuple(span) for span in output[pred_key]])
+        else:
+            raise KeyError("Prediction key invalid: {}".format(pred_key))
+
         correct_preds = gold_set.intersection(preds_set)
         gold_len += len(gold_set)
         pred_len += len(preds_set)
