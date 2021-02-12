@@ -51,7 +51,7 @@ if __name__ == "__main__":
         subtoken_map = output['subtoken_map']
         clusters = output['clusters']
         preds = output['predicted_clusters']
-        top_mentions = output['top_mentions']
+        top_mentions = output['top_spans']
         for i, subword in enumerate(comb_text):
             if i != 0 and sentence_map[i-1] != sentence_map[i]:  # New sentence
                 sent_so_far.append(convert_bert_word(''.join(word_so_far)))
