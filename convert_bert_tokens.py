@@ -59,7 +59,7 @@ if __name__ == "__main__":
                 mapped_outputs.append({'words': sent_so_far,
                                        'clusters': adjust_cluster_indices(clusters, subtoken_map, sentence_start_idx, i-1),
                                        'predicted_clusters': adjust_cluster_indices(clusters, subtoken_map, sentence_start_idx, i-1),
-                                       'top_mentions': adjust_cluster_indices(top_mentions, subtoken_map, sentence_start_idx, i-1)})
+                                       'top_mentions': adjust_top_mentions(top_mentions, subtoken_map, sentence_start_idx, i-1)})
                 sent_so_far = []
                 sentence_start_idx = i
             elif i != 0 and subtoken_map[i-1] != subtoken_map[i]:  # New word
