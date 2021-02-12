@@ -31,7 +31,7 @@ if __name__ == "__main__":
     num_gold = 0
     for gold_span, spanbert_span, spanbert_top_mention, parser_span in zip(gold_spans, spanbert_spans, spanbert_top_mentions, parser_spans):
         spanbert_parser_union = spanbert_span.union(parser_span)
-        spanbert_top_mention_parser_union = spanbert_top_mention.intersection(parser_span)
+        spanbert_top_mention_parser_union = spanbert_top_mention.union(parser_span)
 
         spanbert_parser_correct = gold_span.intersection(spanbert_parser_union)
         spanbert_top_mention_parser_correct = gold_span.intersection(spanbert_top_mention_parser_union)
