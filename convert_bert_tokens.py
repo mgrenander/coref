@@ -24,10 +24,20 @@ def adjust_cluster_indices(clusters, subtoken_map, sent_start, sent_end):
     return adjusted_clusters
 
 
+def adjust_top_mentions(mentions, subtoken_map, sent_start, sent_end):
+    adjusted_mentions = []
+    for mention in mentions:
+        if mention[0] >= sent_start and mention[1] <= sent_end:
+            adjusted_start = subtoken_map[mention[0]] - subtoken_map[sent_start]
+            adjusted_end = subtoken_map[mention[1]] - subtoken_map[sent_start]
+            adjusted_mentions.append((adjusted_start, adjusted_end))
+    return adjusted_mentions
+
+
 if __name__ == "__main__":
-    dataset = 'test'
+    dataset = 'dev'
     outputs = []
-    with jsonlines.open("data/{}.english.512.jsonlines".format(dataset)) as reader:
+    with jsonlines.open("data/{}.output.english.512.jsonlines".format(dataset)) as reader:
         for line in reader:
             outputs.append(line)
 
@@ -40,12 +50,16 @@ if __name__ == "__main__":
         sentence_map = output['sentence_map']
         subtoken_map = output['subtoken_map']
         clusters = output['clusters']
+        preds = output['predicted_clusters']
+        top_mentions = output['top_mentions']
         for i, subword in enumerate(comb_text):
             if i != 0 and sentence_map[i-1] != sentence_map[i]:  # New sentence
                 sent_so_far.append(convert_bert_word(''.join(word_so_far)))
                 word_so_far = []
-
-                mapped_outputs.append({'words': sent_so_far, 'spans': adjust_cluster_indices(clusters, subtoken_map, sentence_start_idx, i-1)})
+                mapped_outputs.append({'words': sent_so_far,
+                                       'clusters': adjust_cluster_indices(clusters, subtoken_map, sentence_start_idx, i-1),
+                                       'predicted_clusters': adjust_cluster_indices(clusters, subtoken_map, sentence_start_idx, i-1),
+                                       'top_mentions': adjust_cluster_indices(top_mentions, subtoken_map, sentence_start_idx, i-1)})
                 sent_so_far = []
                 sentence_start_idx = i
             elif i != 0 and subtoken_map[i-1] != subtoken_map[i]:  # New word
