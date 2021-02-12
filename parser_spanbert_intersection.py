@@ -24,24 +24,28 @@ if __name__ == "__main__":
             else:
                 parser_spans.append(set())
 
-    num_spanbert_parser_intersect = 0
-    num_spanbert_top_mention_parser_intersect = 0
-    num_parser_correct = 0
+    num_spanbert_parser_correct = 0
+    num_spanbert_top_mention_parser_correct = 0
+    num_spanbert_correct = 0
+    num_spanbert_top_mention_correct = 0
     num_gold = 0
     for gold_span, spanbert_span, spanbert_top_mention, parser_span in zip(gold_spans, spanbert_spans, spanbert_top_mentions, parser_spans):
-        correct_spanbert_spans = gold_span.intersection(spanbert_span)
-        correct_spanbert_top_mentions = gold_span.intersection(spanbert_top_mention)
-        correct_parser_spans = gold_span.intersection(parser_span)
+        spanbert_parser_union = spanbert_span.union(parser_span)
+        spanbert_top_mention_parser_union = spanbert_top_mention.intersection(parser_span)
 
-        spanbert_parser_intersection = correct_spanbert_spans.intersection(correct_parser_spans)
-        spanbert_top_mention_parser_intersections = correct_spanbert_top_mentions.intersection(correct_parser_spans)
+        spanbert_parser_correct = gold_span.intersection(spanbert_parser_union)
+        spanbert_top_mention_parser_correct = gold_span.intersection(spanbert_top_mention_parser_union)
+        spanbert_correct = gold_span.intersection(spanbert_span)
+        spanbert_top_mention_correct = gold_span.intersection(spanbert_top_mention)
 
-        num_spanbert_parser_intersect += len(spanbert_parser_intersection)
-        num_spanbert_top_mention_parser_intersect += len(spanbert_top_mention_parser_intersections)
-        num_parser_correct += len(correct_parser_spans)
+        num_spanbert_parser_correct += len(spanbert_parser_correct)
+        num_spanbert_top_mention_parser_correct += len(spanbert_top_mention_parser_correct)
+        num_spanbert_correct += len(spanbert_correct)
+        num_spanbert_top_mention_correct += len(spanbert_top_mention_correct)
         num_gold += len(gold_span)
 
-    print("# spanbert-parser correct intersection: {}, ".format(num_spanbert_parser_intersect))
-    print("# spanbert (top mentions)-parser correct intersection: {},".format(num_spanbert_top_mention_parser_intersect))
-    print("# parser correct: {}".format(num_parser_correct))
+    print("# spanbert-parser union correct: {}, ".format(num_spanbert_parser_correct))
+    print("# spanbert (top mentions)-parser union correct: {},".format(num_spanbert_top_mention_parser_correct))
+    print("# spanbert correct: {}".format(num_spanbert_correct))
+    print("# spanbert (top mentions) correct: {}".format(num_spanbert_top_mention_correct))
     print("# gold: {}".format(num_gold))
