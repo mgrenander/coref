@@ -105,4 +105,5 @@ if __name__ == "__main__":
             assert len(parser_spans) == len(mapped_outputs)
             with jsonlines.open("data/{}.parser.spanbert.jsonlines".format(dataset), mode='w') as w:
                 for i, output in enumerate(mapped_outputs):
-                    w.write(output.update({'parser_clusters': list(parser_spans[i])}))
+                    output.update({'parser_clusters': list(parser_spans[i])})
+                    w.write(output)
