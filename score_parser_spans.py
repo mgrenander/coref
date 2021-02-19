@@ -9,7 +9,7 @@ if __name__ == "__main__":
     gold_spans = []
     with jsonlines.open("data/{}.adjust_span_sents.jsonlines".format(dataset)) as reader:
         for line in reader:
-            gold_spans.append(set([tuple(x) for x in line['spans']]))
+            gold_spans.append(set([tuple(x) for x in line['clusters']]))
 
     # Load pred spans
     pred_spans = []
