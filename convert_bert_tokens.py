@@ -106,7 +106,7 @@ if __name__ == "__main__":
         na_file = "data/{}.na.spans".format(dataset)
         na_spans = []
         if os.path.exists(na_file):
-            with open(dev_file, 'r') as f:
+            with open(na_file, 'r') as f:
                 for line in f:
                     if line.strip():
                         na_spans.append(set(eval(line.strip()[5:-1])))
