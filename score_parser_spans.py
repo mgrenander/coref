@@ -9,6 +9,7 @@ def load_spans(s_preds):
     else:
         return set(preds)
 
+
 if __name__ == "__main__":
     dataset = 'dev'
 

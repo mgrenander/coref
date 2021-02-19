@@ -1,5 +1,6 @@
 import jsonlines
 import sys
+from score_parser_spans import load_spans
 
 
 if __name__ == "__main__":
@@ -20,7 +21,7 @@ if __name__ == "__main__":
     with open("data/{}_preds/{}.{}.preds".format(dataset, dataset, int(sys.argv[1])), 'r') as f:
         for line in f:
             if line.strip():
-                parser_spans.append(set(eval(line.strip()[5:-1])))
+                parser_spans.append(load_spans(line))
             else:
                 parser_spans.append(set())
 
