@@ -1,6 +1,7 @@
 import jsonlines
 import re
 from tqdm import tqdm
+import sys, os
 
 
 def convert_bert_word(word):
@@ -34,6 +35,14 @@ def adjust_top_mentions(mentions, subtoken_map, sent_start, sent_end):
     return adjusted_mentions
 
 
+def num_speakers(speaker_lists):
+    flat_speaker_list = [speaker for speaker_list in speaker_lists for speaker in speaker_list]
+    speaker_set = set(flat_speaker_list)
+    speaker_set.discard("[SPL]")
+    speaker_set.discard("-")
+    return max(1, len(speaker_set))
+
+
 if __name__ == "__main__":
     dataset = 'dev'
     outputs = []
@@ -56,7 +65,9 @@ if __name__ == "__main__":
             if i != 0 and sentence_map[i-1] != sentence_map[i]:  # New sentence
                 sent_so_far.append(convert_bert_word(''.join(word_so_far)))
                 word_so_far = []
-                mapped_outputs.append({'words': sent_so_far,
+                mapped_outputs.append({'doc_key': output['doc_key'],
+                                       'num_speakers': num_speakers(output['speakers']),
+                                       'words': sent_so_far,
                                        'clusters': adjust_cluster_indices(clusters, subtoken_map, sentence_start_idx, i-1),
                                        'predicted_clusters': adjust_cluster_indices(preds, subtoken_map, sentence_start_idx, i-1),
                                        'top_mentions': adjust_top_mentions(top_mentions, subtoken_map, sentence_start_idx, i-1)})
@@ -79,3 +90,19 @@ if __name__ == "__main__":
     with open('data/{}.raw_tokens.sentences'.format(dataset), mode='w') as f:
         for output in mapped_outputs:
             f.write(' '.join(output['words']).strip() + '\n')
+
+    # Add on parser predictions
+    if len(sys.argv) > 1:
+        dev_file = "data/{}_preds/{}.{}.preds".format(dataset, dataset, int(sys.argv[1]))
+        if os.path.exists(dev_file):
+            parser_spans = []
+            with open(dev_file, 'r') as f:
+                for line in f:
+                    if line.strip():
+                        parser_spans.append(set(eval(line.strip()[5:-1])))
+                    else:
+                        parser_spans.append(set())
+            assert len(parser_spans) == len(mapped_outputs)
+            with jsonlines.open("{}.parser.spanbert.jsonlines".format(dataset), mode='w') as w:
+                for i, output in mapped_outputs:
+                    w.write(output.update({'parser_clusters': list(parser_spans[i])}))
