@@ -93,17 +93,30 @@ if __name__ == "__main__":
 
     # Add on parser predictions
     if len(sys.argv) > 1:
+        parser_spans = []
         dev_file = "data/{}_preds/{}.{}.preds".format(dataset, dataset, int(sys.argv[1]))
         if os.path.exists(dev_file):
-            parser_spans = []
             with open(dev_file, 'r') as f:
                 for line in f:
                     if line.strip():
                         parser_spans.append(set(eval(line.strip()[5:-1])))
                     else:
                         parser_spans.append(set())
-            assert len(parser_spans) == len(mapped_outputs)
-            with jsonlines.open("data/{}.parser.spanbert.jsonlines".format(dataset), mode='w') as w:
-                for i, output in enumerate(mapped_outputs):
-                    output.update({'parser_clusters': list(parser_spans[i])})
-                    w.write(output)
+
+        na_file = "data/{}.na.spans".format(dataset)
+        na_spans = []
+        if os.path.exists(na_file):
+            with open(dev_file, 'r') as f:
+                for line in f:
+                    if line.strip():
+                        na_spans.append(set(eval(line.strip()[5:-1])))
+                    else:
+                        na_spans.append(set())
+
+        assert len(parser_spans) == len(mapped_outputs)
+        assert len(na_spans) == len(mapped_outputs)
+        with jsonlines.open("data/{}.parser.spanbert.jsonlines".format(dataset), mode='w') as w:
+            for i, output in enumerate(mapped_outputs):
+                output.update({'parser_clusters': list(parser_spans[i])})
+                output.update({'na_spans': list(na_spans[i])})
+                w.write(output)
