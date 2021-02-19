@@ -16,7 +16,7 @@ if __name__ == "__main__":
     with open("data/{}_preds/{}.{}.preds".format(dataset, dataset, int(sys.argv[1])), 'r') as f:
         for line in f:
             if line.strip():
-                pred_spans.append(set(eval(line.strip()[5:-1])))
+                pred_spans.append({eval(line.strip()[5:-1])})
             else:
                 pred_spans.append(set())
 
