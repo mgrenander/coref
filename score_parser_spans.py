@@ -2,6 +2,13 @@ import jsonlines
 import sys
 
 
+def load_spans(s_preds):
+    preds = eval(s_preds.strip()[5:-1])
+    if type(preds[0]) != tuple:
+        return {preds}
+    else:
+        return set(preds)
+
 if __name__ == "__main__":
     dataset = 'dev'
 
@@ -16,7 +23,7 @@ if __name__ == "__main__":
     with open("data/{}_preds/{}.{}.preds".format(dataset, dataset, int(sys.argv[1])), 'r') as f:
         for line in f:
             if line.strip():
-                pred_spans.append({eval(line.strip()[5:-1])})
+                pred_spans.append(load_spans(line))
             else:
                 pred_spans.append(set())
 
