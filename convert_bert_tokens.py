@@ -2,6 +2,7 @@ import jsonlines
 import re
 from tqdm import tqdm
 import sys, os
+from score_parser_spans import load_spans
 
 
 def convert_bert_word(word):
@@ -99,7 +100,7 @@ if __name__ == "__main__":
             with open(dev_file, 'r') as f:
                 for line in f:
                     if line.strip():
-                        parser_spans.append(set(eval(line.strip()[5:-1])))
+                        parser_spans.append(load_spans(line))
                     else:
                         parser_spans.append(set())
 
@@ -109,7 +110,7 @@ if __name__ == "__main__":
             with open(na_file, 'r') as f:
                 for line in f:
                     if line.strip():
-                        na_spans.append(set(eval(line.strip()[5:-1])))
+                        na_spans.append(load_spans(line))
                     else:
                         na_spans.append(set())
 
