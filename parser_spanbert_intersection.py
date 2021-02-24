@@ -80,3 +80,15 @@ if __name__ == "__main__":
     print("# spanbert (top mentions)-parser intersection: {}".format(num_spanbert_top_mention_intersection))
     print("# spanbert: {}".format(num_spanbert))
     print("# spanbert (top mentions): {}".format(num_spanbert_top_mention))
+
+    print("---------------------------------------")
+    print("spanbert-no ccg recall: {}".format(num_spanbert_correct / num_gold))
+    print("spanbert-with ccg recall: {}".format(num_spanbert_parser_correct / num_gold))
+    print("spanbert (top mentions)-no ccg recall: {}".format(num_spanbert_top_mention_correct / num_gold))
+    print("spanbert (top mentions)-with ccg recall: {}".format(num_spanbert_top_mention_parser_correct / num_gold))
+
+    print("spanbert-no ccg precision: {}".format(num_spanbert_correct / num_spanbert))
+    print("spanbert-with ccg precision: {}".format(num_spanbert_intersection_correct / num_spanbert_intersection))
+    print("spanbert (top mentions)-no ccg precision".format(num_spanbert_top_mention_correct / num_spanbert_top_mention))
+    print("spanbert (top mentions)-with ccg precision".format(num_spanbert_top_mention_intersection_correct / num_spanbert_top_mention_intersection))
+
