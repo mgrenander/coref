@@ -7,7 +7,7 @@ from score_parser_spans import load_spans
 
 def convert_bert_word(word):
     """
-    Convert bert token to regular word. Convert -LRB- and -RRB- tokens to regular parentheses
+    Convert bert token to regular word.
     """
     return re.sub("##|\[SEP\]|\[CLS\]", "", word)
 
@@ -75,7 +75,9 @@ if __name__ == "__main__":
                 sent_so_far = []
                 sentence_start_idx = i
             elif i != 0 and subtoken_map[i-1] != subtoken_map[i]:  # New word
-                sent_so_far.append(convert_bert_word(''.join(word_so_far)))
+                fullword = ''.join(word_so_far)
+                if fullword != '[SEP][CLS]':  # Need to do this because sentences indices are incremented at SEP and CLS tokens
+                    sent_so_far.append(convert_bert_word(fullword))
                 word_so_far = []
 
             word_so_far.append(subword)
