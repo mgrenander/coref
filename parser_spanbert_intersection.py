@@ -89,6 +89,6 @@ if __name__ == "__main__":
 
     print("spanbert-no ccg precision: {}".format(num_spanbert_correct / num_spanbert))
     print("spanbert-with ccg precision: {}".format(num_spanbert_intersection_correct / num_spanbert_intersection))
-    print("spanbert (top mentions)-no ccg precision".format(num_spanbert_top_mention_correct / num_spanbert_top_mention))
-    print("spanbert (top mentions)-with ccg precision".format(num_spanbert_top_mention_intersection_correct / num_spanbert_top_mention_intersection))
+    print("spanbert (top mentions)-no ccg precision: {}".format(num_spanbert_top_mention_correct / num_spanbert_top_mention))
+    print("spanbert (top mentions)-with ccg precision: {}".format(num_spanbert_top_mention_intersection_correct / num_spanbert_top_mention_intersection))
 
