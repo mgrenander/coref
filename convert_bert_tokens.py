@@ -78,6 +78,8 @@ if __name__ == "__main__":
                 fullword = ''.join(word_so_far)
                 if fullword != '[SEP][CLS]':  # Need to do this because sentences indices are incremented at SEP and CLS tokens
                     sent_so_far.append(convert_bert_word(fullword))
+                else:
+                    sentence_start_idx += 2  # The sentence actually starts two tokens later due to [SEP] and [CLS]
                 word_so_far = []
 
             word_so_far.append(subword)
