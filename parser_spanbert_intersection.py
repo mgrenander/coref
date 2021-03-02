@@ -50,8 +50,8 @@ if __name__ == "__main__":
         models['tm_p_inter'] = models['top_m'].intersection(models['parser'])
 
         # Random removal
-        models['sb_rand_rem'] = random.sample(models['spanbert'], len(models['sb_p_inter']))
-        models['tm_rand_rem'] = random.sample(models['top_m'], len(models['tm_p_inter']))
+        models['sb_rand_rem'] = set(random.sample(models['spanbert'], len(models['sb_p_inter'])))
+        models['tm_rand_rem'] = set(random.sample(models['top_m'], len(models['tm_p_inter'])))
 
         # Score all models
         counts['gold'] += len(gold)
