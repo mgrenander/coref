@@ -57,7 +57,7 @@ if __name__ == "__main__":
         counts['gold'] += len(gold)
         for model_key in models.keys():
             counts[model_key] += len(models[model_key])
-            correct_counts += len(models[model_key].intersection(gold))
+            correct_counts[model_key] += len(models[model_key].intersection(gold))
 
     # Reporting
     print("RECALL")
