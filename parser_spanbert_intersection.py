@@ -1,6 +1,4 @@
 import jsonlines
-import sys
-from score_parser_spans import load_spans
 import random
 
 if __name__ == "__main__":
