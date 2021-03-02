@@ -63,9 +63,9 @@ if __name__ == "__main__":
     print("RECALL")
     for model_key in correct_counts.keys():
         recall = correct_counts[model_key] / counts['gold']
-        print("Model={}, Correct Count={}, Recall={}".format(model_key, correct_counts[model_key], recall))
+        print("Model={}, Correct Count={}, Recall={:.3f}".format(model_key, correct_counts[model_key], 100*recall))
 
     print("PRECISION")
     for model_key in correct_counts.keys():
         precision = correct_counts[model_key] / counts[model_key]
-        print("Model={}, Correct Count={}, Counts={}, Precision={}".format(model_key, correct_counts[model_key], counts[model_key], precision))
+        print("Model={}, Correct Count={}, Counts={}, Precision={:.3f}".format(model_key, correct_counts[model_key], counts[model_key], 100*precision))
