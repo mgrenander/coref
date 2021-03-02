@@ -1,94 +1,73 @@
 import jsonlines
 import sys
 from score_parser_spans import load_spans
-
+import random
 
 if __name__ == "__main__":
     dataset = 'dev'
-
-    # Load gold spans
-    gold_spans = []
-    spanbert_spans = []
-    spanbert_top_mentions = []
-    with jsonlines.open("data/{}.adjust_span_sents.jsonlines".format(dataset)) as reader:
+    outputs = []
+    with jsonlines.open("data/{}.parser.spanbert.jsonlines".format(dataset), 'r') as reader:
         for line in reader:
-            gold_spans.append(set([tuple(x) for x in line['clusters']]))
-            spanbert_spans.append(set([tuple(x) for x in line['predicted_clusters']]))
-            spanbert_top_mentions.append(set([tuple(x) for x in line['top_mentions']]))
+            outputs.append(line)
 
-    # Load pred spans
-    parser_spans = []
-    with open("data/{}_preds/{}.{}.preds".format(dataset, dataset, int(sys.argv[1])), 'r') as f:
-        for line in f:
-            if line.strip():
-                parser_spans.append(load_spans(line))
-            else:
-                parser_spans.append(set())
+    counts = {
+        'gold': 0,
+        'spanbert': 0,
+        'top_m': 0,
+        'parser': 0,
+        'sb_p_union': 0,  # SpanBert Parser Union
+        'tm_p_union': 0,  # SpanBert (top mentions) Parser Union
+        'sb_p_inter': 0,  # SpanBert Parser Intersection
+        'tm_p_inter': 0,  # SpanBert (top mentions) Parser Intersection
+        'sb_rand_rem': 0, # Randomly removing mentions from SpanBert
+        'tm_rand_rem': 0, # Randomly removing mentions from Top Mentions model
+    }
 
-    num_spanbert_parser_correct = 0
-    num_spanbert_top_mention_parser_correct = 0
-    num_spanbert_correct = 0
-    num_spanbert_top_mention_correct = 0
-    num_spanbert_intersection_correct = 0
-    num_spanbert_top_mention_intersection_correct = 0
-    num_gold = 0
-    num_parse = 0
-    num_spanbert = 0
-    num_spanbert_top_mention = 0
-    num_spanbert_intersection = 0
-    num_spanbert_top_mention_intersection = 0
-    for gold_span, spanbert_span, spanbert_top_mention, parser_span in zip(gold_spans, spanbert_spans, spanbert_top_mentions, parser_spans):
+    correct_counts = {
+        'spanbert': 0,
+        'top_m': 0,
+        'parser': 0,
+        'sb_p_union': 0,  # SpanBert Parser Union
+        'tm_p_union': 0,  # SpanBert (top mentions) Parser Union
+        'sb_p_inter': 0,  # SpanBert Parser Intersection
+        'tm_p_inter': 0,  # SpanBert (top mentions) Parser Intersection
+        'sb_rand_rem': 0,  # Randomly removing mentions from SpanBert
+        'tm_rand_rem': 0,  # Randomly removing mentions from Top Mentions model
+    }
+
+    for output in outputs:
+        gold = set([tuple(x) for x in output['clusters']])
+        models = {
+            'spanbert': set([tuple(x) for x in output['predicted_clusters']]),
+            'top_m': set([tuple(x) for x in output['top_mentions']]),
+            'parser': set([tuple(x) for x in output['parser_clusters']])
+        }
+
         # Union
-        spanbert_parser_union = spanbert_span.union(parser_span)
-        spanbert_top_mention_parser_union = spanbert_top_mention.union(parser_span)
-        spanbert_parser_union_correct = gold_span.intersection(spanbert_parser_union)
-        spanbert_top_mention_parser_union_correct = gold_span.intersection(spanbert_top_mention_parser_union)
-        num_spanbert_parser_correct += len(spanbert_parser_union_correct)
-        num_spanbert_top_mention_parser_correct += len(spanbert_top_mention_parser_union_correct)
+        models['sb_p_union'] = models['spanbert'].union(models['parser'])
+        models['tm_p_union'] = models['top_m'].union(models['parser'])
 
         # Intersection
-        spanbert_parser_intersection = spanbert_span.intersection(parser_span)
-        spanbert_top_mention_parser_intersection = spanbert_top_mention.intersection(parser_span)
-        spanbert_parser_intersection_correct = gold_span.intersection(spanbert_parser_intersection)
-        spanbert_top_mention_parser_intersection_correct = gold_span.intersection(spanbert_top_mention_parser_intersection)
-        num_spanbert_intersection_correct += len(spanbert_parser_intersection_correct)
-        num_spanbert_top_mention_intersection_correct += len(spanbert_top_mention_parser_intersection_correct)
+        models['sb_p_inter'] = models['spanbert'].intersection(models['parser'])
+        models['tm_p_inter'] = models['top_m'].intersection(models['parser'])
 
-        num_spanbert_intersection += len(spanbert_parser_intersection)
-        num_spanbert_top_mention_intersection += len(spanbert_top_mention_parser_intersection)
+        # Random removal
+        models['sb_rand_rem'] = random.sample(models['spanbert'], len(models['sb_p_inter']))
+        models['tm_rand_rem'] = random.sample(models['top_m'], len(models['tm_p_inter']))
 
-        spanbert_correct = gold_span.intersection(spanbert_span)
-        spanbert_top_mention_correct = gold_span.intersection(spanbert_top_mention)
+        # Score all models
+        counts['gold'] += len(gold)
+        for model_key in models.keys():
+            counts[model_key] += len(models[model_key])
+            correct_counts += len(models[model_key].intersection(gold))
 
+    # Reporting
+    print("RECALL")
+    for model_key in correct_counts.keys():
+        recall = correct_counts[model_key] / counts['gold']
+        print("Model={}, Correct Count={}, Recall={}".format(model_key, correct_counts[model_key], recall))
 
-        num_spanbert_correct += len(spanbert_correct)
-        num_spanbert_top_mention_correct += len(spanbert_top_mention_correct)
-        num_gold += len(gold_span)
-        num_parse += len(parser_span)
-        num_spanbert += len(spanbert_span)
-        num_spanbert_top_mention += len(spanbert_top_mention)
-
-    print("# spanbert-parser union correct: {}, ".format(num_spanbert_parser_correct))
-    print("# spanbert (top mentions)-parser union correct: {},".format(num_spanbert_top_mention_parser_correct))
-    print("# spanbert correct: {}".format(num_spanbert_correct))
-    print("# spanbert (top mentions) correct: {}".format(num_spanbert_top_mention_correct))
-    print("# gold: {}".format(num_gold))
-
-    print("# spanbert-parser intersection correct: {}".format(num_spanbert_intersection_correct))
-    print("# spanbert (top mentions)-parser intersection correct: {}".format(num_spanbert_top_mention_intersection_correct))
-    print("# spanbert-parser intersection: {}".format(num_spanbert_intersection))
-    print("# spanbert (top mentions)-parser intersection: {}".format(num_spanbert_top_mention_intersection))
-    print("# spanbert: {}".format(num_spanbert))
-    print("# spanbert (top mentions): {}".format(num_spanbert_top_mention))
-
-    print("---------------------------------------")
-    print("spanbert-no ccg recall: {}".format(num_spanbert_correct / num_gold))
-    print("spanbert-with ccg recall: {}".format(num_spanbert_parser_correct / num_gold))
-    print("spanbert (top mentions)-no ccg recall: {}".format(num_spanbert_top_mention_correct / num_gold))
-    print("spanbert (top mentions)-with ccg recall: {}".format(num_spanbert_top_mention_parser_correct / num_gold))
-
-    print("spanbert-no ccg precision: {}".format(num_spanbert_correct / num_spanbert))
-    print("spanbert-with ccg precision: {}".format(num_spanbert_intersection_correct / num_spanbert_intersection))
-    print("spanbert (top mentions)-no ccg precision: {}".format(num_spanbert_top_mention_correct / num_spanbert_top_mention))
-    print("spanbert (top mentions)-with ccg precision: {}".format(num_spanbert_top_mention_intersection_correct / num_spanbert_top_mention_intersection))
-
+    print("PRECISION")
+    for model_key in correct_counts.keys():
+        precision = correct_counts[model_key] / counts[model_key]
+        print("Model={}, Correct Count={}, Counts={}, Precision={}".format(model_key, correct_counts[model_key], counts[model_key], precision))
