@@ -4,6 +4,8 @@ from tqdm import tqdm
 import os
 from score_parser_spans import load_spans
 import argparse
+import stanza
+import logging
 
 
 def get_config():
@@ -103,11 +105,84 @@ def add_na_spans(args, mapped_outputs):
         raise ValueError("Cannot find NA spans at path: {}".format(na_file))
 
 
-def convert_bert_tokens(args, outputs):
+def adjust_ner_words(words, named_entity_indices):
+    """Bunch together named entities with <NE> string and return updated token list."""
+    adjusted_words = []
+    curr_named_entity = []
+    ne_idx = 0
+    curr_ne_start_idx, curr_ne_end_idx = named_entity_indices[ne_idx]
+    for i, token in enumerate(words):
+        if curr_ne_start_idx <= i <= curr_ne_end_idx:
+            curr_named_entity.append(token)
+
+            if i == curr_ne_end_idx:
+                adjusted_words.append("<NE>".join(curr_named_entity))
+
+                # Update various indices
+                curr_named_entity = []
+                ne_idx += 1
+                if ne_idx < len(named_entity_indices):
+                    curr_ne_start_idx, curr_ne_end_idx = named_entity_indices[ne_idx]  # Track next NE
+                else:
+                    curr_ne_start_idx, curr_ne_end_idx = len(words), len(words)  # Don't enter this block anymore
+        else:
+            adjusted_words.append(token)
+    return adjusted_words
+
+
+def adjust_with_ner(mapped_outputs):
+    """
+
+    """
+    stanza.download('en')
+    nlp = stanza.Pipeline(lang='en', processors='tokenize,ner', tokenize_pretokenized=True)
+    sents_so_far = []
+    entity_indices = []
+    curr_doc_key = mapped_outputs[0]['doc_key']
+    logging.info("Running NER.")
+    for output in tqdm(mapped_outputs):
+        if output['doc_key'] != curr_doc_key:  # After reaching the end of document, we run NER.
+            sents = "\n".join(sents_so_far)
+            doc = nlp(sents)
+            for sent in doc.sentences:
+                sent_entity_indices = []
+                ent_begin_idx = -1
+                for i, token in enumerate(sent.tokens):
+                    # Ignore S and O tokens, since they will not be modified.
+                    if token.ner[0] == "B":
+                        ent_begin_idx = i
+                    elif token.ner[0] == "E":
+                        sent_entity_indices.append((ent_begin_idx, i))
+                entity_indices.append(sent_entity_indices)
+            sents_so_far = []
+
+        sents_so_far.append(" ".join(output['words']))
+        curr_doc_key = mapped_outputs[0]['doc_key']
+
+    logging.info("Formatting output dictionary and adjusting indices")
+    assert len(entity_indices) == len(mapped_outputs)
+    for output, sent_entity_indices in zip(mapped_outputs, entity_indices):
+        if sent_entity_indices:
+            mention_indices = output['clusters']
+            adjusted_mention_indices = []
+
+            output['ne_adjusted_words'] = adjust_ner_words(output['words'], sent_entity_indices)
+            output['ne_adjusted_mention_indices'] = output['clusters']  # TODO: remove these
+            output['ne_mention_error_indices'] = []
+        else:  # No named entities in this sentence.
+            output['ne_adjusted_words'] = output['words']
+            output['ne_adjusted_mention_indices'] = output['clusters']
+            output['ne_mention_error_indices'] = []
+
+    return mapped_outputs
+
+
+def convert_bert_tokens(outputs):
     """
     Converts BERT tokens into a readable format for the parser, i.e. using Penn Treebank tokenization scheme.
     Does the heavy lifting for this script.
     """
+    logging.info("Adjust BERT indices to align with Penn Treebank.")
     mapped_outputs = []  # Will hold the final results: sentences and mapped span indices
     for output in tqdm(outputs):
         comb_text = [word for sentence in output['sentences'] for word in sentence]
@@ -144,13 +219,16 @@ def convert_bert_tokens(args, outputs):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
     args = get_config()
     outputs = []
     with jsonlines.open("data/{}.output.english.512.jsonlines".format(args.dataset)) as reader:
         for line in reader:
             outputs.append(line)
 
-    mapped_outputs = convert_bert_tokens(args, outputs)
+    mapped_outputs = convert_bert_tokens(outputs)
+    if args.ner:
+        mapped_outputs = adjust_with_ner(mapped_outputs)
 
     with jsonlines.open('data/{}.adjust_span_sents.jsonlines'.format(args.dataset), mode='w') as w:
         for output in mapped_outputs:
