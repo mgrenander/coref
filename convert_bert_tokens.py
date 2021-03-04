@@ -17,6 +17,7 @@ def get_config():
     config_parser.add_argument("--ner", action="store_true", help="use NER to group NE tokens")
     config_parser.add_argument("--parser_preds", type=int, default=-1, help="attach parser preds with top-k categories")
     config_parser.add_argument("--use_na_spans", action="store_true", help="attach mentions not captured by parser")
+    config_parser.add_argument("--use_gpu", action='store_true')
     return config_parser.parse_args()
 
 
@@ -130,12 +131,12 @@ def adjust_ner_words(words, named_entity_indices):
     return adjusted_words
 
 
-def adjust_with_ner(mapped_outputs):
+def adjust_with_ner(mapped_outputs, use_gpu):
     """
     Create new token lists with NE grouped together, adjust mention indices accordingly and compute resulting MD errors.
     """
     stanza.download('en')
-    nlp = stanza.Pipeline(lang='en', processors='tokenize,ner', tokenize_pretokenized=True)
+    nlp = stanza.Pipeline(lang='en', processors='tokenize,ner', tokenize_pretokenized=True, use_gpu=use_gpu)
     sents_so_far = []
     entity_indices = []
     curr_doc_key = mapped_outputs[0]['doc_key']
@@ -228,7 +229,7 @@ if __name__ == "__main__":
 
     mapped_outputs = convert_bert_tokens(outputs)
     if args.ner:
-        mapped_outputs = adjust_with_ner(mapped_outputs)
+        mapped_outputs = adjust_with_ner(mapped_outputs, args.use_gpu)
 
     with jsonlines.open('data/{}.adjust_span_sents.jsonlines'.format(args.dataset), mode='w') as w:
         for output in mapped_outputs:
