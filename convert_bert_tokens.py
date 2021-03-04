@@ -15,8 +15,8 @@ def get_config():
     config_parser = argparse.ArgumentParser()
     config_parser.add_argument("--dataset", type=str, default='dev')
     config_parser.add_argument("--ner", type=str, default="", help="all, or list of types")
-    config_parser.add_argument("--parser_preds", type=int, default=-1, help="attach on parser preds with top-k categories")
-    config_parser.add_argument("--use_na_spans", action="store_true", help="attach on mentions not captured by parser")
+    config_parser.add_argument("--parser_preds", type=int, default=-1, help="attach parser preds with top-k categories")
+    config_parser.add_argument("--use_na_spans", action="store_true", help="attach mentions not captured by parser")
     return config_parser.parse_args()
 
 
@@ -132,7 +132,7 @@ def adjust_ner_words(words, named_entity_indices):
 
 def adjust_with_ner(mapped_outputs):
     """
-
+    Create new token lists with NE grouped together, adjust mention indices accordingly and compute resulting MD errors.
     """
     stanza.download('en')
     nlp = stanza.Pipeline(lang='en', processors='tokenize,ner', tokenize_pretokenized=True)
@@ -182,7 +182,7 @@ def convert_bert_tokens(outputs):
     Converts BERT tokens into a readable format for the parser, i.e. using Penn Treebank tokenization scheme.
     Does the heavy lifting for this script.
     """
-    logging.info("Adjust BERT indices to align with Penn Treebank.")
+    logging.info("Adjusting BERT indices to align with Penn Treebank.")
     mapped_outputs = []  # Will hold the final results: sentences and mapped span indices
     for output in tqdm(outputs):
         comb_text = [word for sentence in output['sentences'] for word in sentence]
