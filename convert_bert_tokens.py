@@ -14,7 +14,7 @@ def get_config():
     """
     config_parser = argparse.ArgumentParser()
     config_parser.add_argument("--dataset", type=str, default='dev')
-    config_parser.add_argument("--ner", type=str, default="", help="all, or list of types")
+    config_parser.add_argument("--ner", type=str, action="store_true")
     config_parser.add_argument("--parser_preds", type=int, default=-1, help="attach parser preds with top-k categories")
     config_parser.add_argument("--use_na_spans", action="store_true", help="attach mentions not captured by parser")
     return config_parser.parse_args()
