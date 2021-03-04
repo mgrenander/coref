@@ -160,8 +160,10 @@ def adjust_with_ner(mapped_outputs, use_gpu):
         sents_so_far.append(" ".join(output['words']))
         curr_doc_key = mapped_outputs[0]['doc_key']
 
-    logging.info("Formatting output dictionary and adjusting indices")
+    logging.info("Entity indices: {}, Mapped Outputs: {}".format(len(entity_indices), len(mapped_outputs)))
     assert len(entity_indices) == len(mapped_outputs)
+
+    logging.info("Formatting output dictionary and adjusting indices")
     for output, sent_entity_indices in zip(mapped_outputs, entity_indices):
         if sent_entity_indices:
             mention_indices = output['clusters']
