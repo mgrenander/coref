@@ -106,6 +106,26 @@ def add_na_spans(args, mapped_outputs):
         raise ValueError("Cannot find NA spans at path: {}".format(na_file))
 
 
+def find_ner_indices(sents, ner_model):
+    """
+    Run NER model over a document and return list of list of tuples corresponding to entity index ranges for each sent.
+    """
+    sents = "\n".join(sents)
+    doc = ner_model(sents)
+    entity_indices = []
+    for sent in doc.sentences:
+        sent_entity_indices = []
+        ent_begin_idx = -1
+        for i, token in enumerate(sent.tokens):
+            # Ignore S and O tokens, since they will not be modified.
+            if token.ner[0] == "B":
+                ent_begin_idx = i
+            elif token.ner[0] == "E":
+                sent_entity_indices.append((ent_begin_idx, i))
+        entity_indices.append(sent_entity_indices)
+    return entity_indices
+
+
 def adjust_ner_words(words, named_entity_indices):
     """Bunch together named entities with <NE> string and return updated token list."""
     adjusted_words = []
@@ -115,7 +135,6 @@ def adjust_ner_words(words, named_entity_indices):
     for i, token in enumerate(words):
         if curr_ne_start_idx <= i <= curr_ne_end_idx:
             curr_named_entity.append(token)
-
             if i == curr_ne_end_idx:
                 adjusted_words.append("<NE>".join(curr_named_entity))
 
@@ -143,23 +162,14 @@ def adjust_with_ner(mapped_outputs, use_gpu):
     logging.info("Running NER.")
     for output in tqdm(mapped_outputs):
         if output['doc_key'] != curr_doc_key:  # After reaching the end of document, we run NER.
-            sents = "\n".join(sents_so_far)
-            doc = nlp(sents)
-            for sent in doc.sentences:
-                sent_entity_indices = []
-                ent_begin_idx = -1
-                for i, token in enumerate(sent.tokens):
-                    # Ignore S and O tokens, since they will not be modified.
-                    if token.ner[0] == "B":
-                        ent_begin_idx = i
-                    elif token.ner[0] == "E":
-                        sent_entity_indices.append((ent_begin_idx, i))
-                entity_indices.append(sent_entity_indices)
+            sent_entity_indices = find_ner_indices(sents_so_far, nlp)
+            entity_indices += sent_entity_indices
             sents_so_far = []
 
         sents_so_far.append(" ".join(output['words']))
-        curr_doc_key = mapped_outputs[0]['doc_key']
-
+        curr_doc_key = output['doc_key']
+    sent_entity_indices = find_ner_indices(sents_so_far, nlp)
+    entity_indices += sent_entity_indices
     logging.info("Entity indices: {}, Mapped Outputs: {}".format(len(entity_indices), len(mapped_outputs)))
     assert len(entity_indices) == len(mapped_outputs)
 
