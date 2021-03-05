@@ -189,7 +189,7 @@ def adjust_with_ner(mapped_outputs, use_gpu):
     Create new token lists with NE grouped together, adjust mention indices accordingly and compute resulting MD errors.
     """
     stanza.download('en')
-    nlp = stanza.Pipeline(lang='en', processors='ner', tokenize_pretokenized=True, use_gpu=use_gpu)
+    nlp = stanza.Pipeline(lang='en', processors='tokenize,ner', tokenize_pretokenized=True, use_gpu=use_gpu)
     sents_so_far = []
     entity_indices = []
     curr_doc_key = mapped_outputs[0]['doc_key']
