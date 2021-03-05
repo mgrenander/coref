@@ -15,8 +15,8 @@ def get_config():
     config_parser = argparse.ArgumentParser()
     config_parser.add_argument("--dataset", type=str, default='dev')
     config_parser.add_argument("--ner", action="store_true", help="use NER to group NE tokens")
-    config_parser.add_argument("--parser_preds", type=int, default=-1, help="attach parser preds with top-k categories")
-    config_parser.add_argument("--use_na_spans", action="store_true", help="attach mentions not captured by parser")
+    config_parser.add_argument("--parser_preds", type=int, default=0, help="attach parser preds with top-k categories")
+    config_parser.add_argument("--na_file", type=str, default="", help="attach mentions not captured by parser")
     config_parser.add_argument("--use_gpu", action='store_true')
     return config_parser.parse_args()
 
@@ -86,11 +86,11 @@ def add_parser_preds(args, mapped_outputs):
         raise ValueError("Cannot find dev preds at path: {}".format(dev_file))
 
 
-def add_na_spans(args, mapped_outputs):
+def add_na_spans(na_filename, mapped_outputs):
     """
     Adds mentions that do not correspond to any node in the tree to the output dictionary.
     """
-    na_file = "data/{}.na.spans".format(args.dataset)
+    na_file = "data/{}".format(na_filename)
     na_spans = []
     if os.path.exists(na_file):
         with open(na_file, 'r') as f:
@@ -150,12 +150,46 @@ def adjust_ner_words(words, named_entity_indices):
     return adjusted_words
 
 
+def adjust_ner_mention_indices(mention_indices, named_entity_indices, sent_idx):
+    """
+    Adjusts mention indices after grouping named entities into single tokens.
+    Returns the adjusted indices, and mention indices that cannot be mapped due to the NER changes.
+    """
+    error_mentions = []
+    curr_adj_mention_indices = mention_indices
+    for ne_start, ne_end in named_entity_indices:
+        new_adj_mention_indices = []
+        ne_length_factor = ne_end - ne_start
+        for mention_start, mention_end in curr_adj_mention_indices:
+            if mention_end < ne_start:  # No overlap, left
+                new_adj_mention_indices.append((mention_start, mention_end))
+            elif mention_start < ne_start <= mention_end <= ne_end:  # Partial overlap, left
+                new_adj_mention_indices.append((mention_start, ne_start))
+            elif mention_start == ne_start and mention_end == ne_end:  # Exact match
+                new_adj_mention_indices.append((ne_start, ne_start))
+            elif ne_start <= mention_start <= ne_end and ne_start <= mention_end <= ne_end:  # Partial or full nested
+                error_mentions.append((ne_start, ne_end))
+            elif ne_start <= mention_start <= ne_end < mention_end:  # Partial overlap, right
+                new_adj_mention_indices.append((ne_start, mention_end - ne_length_factor))
+            elif ne_end < mention_start:  # No overlap, right
+                new_adj_mention_indices.append((mention_start - ne_length_factor, mention_end - ne_length_factor))
+            elif mention_start < ne_start and ne_end < mention_end:  # Envelop
+                new_adj_mention_indices.append((mention_start, mention_end - ne_length_factor))
+            else:
+                error_msg = "Could not map at mention index={}, NE index={}, sentence index={}".format(
+                    (mention_start, mention_end), (ne_start, ne_end), sent_idx
+                )
+                raise ValueError(error_msg)
+        curr_adj_mention_indices = new_adj_mention_indices
+    return curr_adj_mention_indices, error_mentions
+
+
 def adjust_with_ner(mapped_outputs, use_gpu):
     """
     Create new token lists with NE grouped together, adjust mention indices accordingly and compute resulting MD errors.
     """
     stanza.download('en')
-    nlp = stanza.Pipeline(lang='en', processors='tokenize,ner', tokenize_pretokenized=True, use_gpu=use_gpu)
+    nlp = stanza.Pipeline(lang='en', processors='ner', tokenize_pretokenized=True, use_gpu=use_gpu)
     sents_so_far = []
     entity_indices = []
     curr_doc_key = mapped_outputs[0]['doc_key']
@@ -174,19 +208,18 @@ def adjust_with_ner(mapped_outputs, use_gpu):
     assert len(entity_indices) == len(mapped_outputs)
 
     logging.info("Formatting output dictionary and adjusting indices")
-    for output, sent_entity_indices in zip(mapped_outputs, entity_indices):
+    for i, (output, sent_entity_indices) in enumerate(zip(mapped_outputs, entity_indices)):
         if sent_entity_indices:
-            mention_indices = output['clusters']
-            adjusted_mention_indices = []
-
             output['ne_adjusted_words'] = adjust_ner_words(output['words'], sent_entity_indices)
-            output['ne_adjusted_mention_indices'] = output['clusters']  # TODO: remove these
-            output['ne_mention_error_indices'] = []
+            adj_mention_indices, error_mention_indices = adjust_ner_mention_indices(output['clusters'], sent_entity_indices, i)
+            output['ne_adjusted_mention_indices'] = adj_mention_indices
+            output['ne_mention_error_indices'] = error_mention_indices
         else:  # No named entities in this sentence.
             output['ne_adjusted_words'] = output['words']
             output['ne_adjusted_mention_indices'] = output['clusters']
             output['ne_mention_error_indices'] = []
 
+    # TODO: validate all outputs
     return mapped_outputs
 
 
@@ -240,27 +273,37 @@ if __name__ == "__main__":
             outputs.append(line)
 
     mapped_outputs = convert_bert_tokens(outputs)
+    file_adj_prefix = ""
     if args.ner:
         mapped_outputs = adjust_with_ner(mapped_outputs, args.use_gpu)
+        file_adj_prefix += "ner."
 
-    with jsonlines.open('data/{}.adjust_span_sents.jsonlines'.format(args.dataset), mode='w') as w:
+    with jsonlines.open('data/{}.{}adjust_span_sents.jsonlines'.format(args.dataset, file_adj_prefix), mode='w') as w:
         for output in mapped_outputs:
             w.write(output)
 
-    with open('data/{}.spans'.format(args.dataset), mode='w') as w:
+    with open('data/{}.{}spans'.format(args.dataset, file_adj_prefix), mode='w') as w:
         for output in mapped_outputs:
-            w.write(" ".join([str(idx) for span in output['clusters'] for idx in span]) + '\n')
+            if args.ner:
+                to_write = " ".join([str(idx) for span in output['ne_adjusted_mention_indices'] for idx in span])
+            else:
+                to_write = " ".join([str(idx) for span in output['clusters'] for idx in span])
+            w.write(to_write + '\n')
 
-    with open('data/{}.raw_tokens.sentences'.format(args.dataset), mode='w') as f:
+    with open('data/{}.{}raw_tokens.sentences'.format(args.dataset, file_adj_prefix), mode='w') as f:
         for output in mapped_outputs:
-            f.write(' '.join(output['words']).strip() + '\n')
+            if args.ner:
+                to_write = ' '.join(output['ne_adjusted_words']).strip()
+            else:
+                to_write = ' '.join(output['words']).strip()
+            f.write(to_write + '\n')
 
     # Add on parser predictions
-    if args.parser_preds != -1:
+    if args.parser_preds:
         add_parser_preds(args, mapped_outputs)
 
-    if args.use_na_spans:
-        add_na_spans(args, mapped_outputs)
+    if args.na_file:
+        add_na_spans(args.na_file, mapped_outputs)
 
     if args.parser_preds != -1 or args.use_na_spans:
         with jsonlines.open("data/{}.parser.spanbert.jsonlines".format(args.dataset), mode='w') as w:
