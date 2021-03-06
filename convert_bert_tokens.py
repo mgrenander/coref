@@ -150,38 +150,47 @@ def adjust_ner_words(words, named_entity_indices):
     return adjusted_words
 
 
-def adjust_ner_mention_indices(mention_indices, named_entity_indices, sent_idx):
+def valid_mapping(mention_start, mention_end, ne_indices):
+    """Determine if the mention can be mapped under merging named entities."""
+    for ne_start, ne_end in ne_indices:
+        if mention_start == ne_start and mention_end == ne_end:  # Exact match
+            return True
+        elif ne_start <= mention_start <= ne_end and ne_start <= mention_end <= ne_end: # Partial or full nested
+            return False
+    return True
+
+
+def adjust_ner_mention_indices(mention_indices, ne_indices, subtoken_map):
+    """Adjusts mention indices after grouping named entities into single tokens.
+    Returns the adjusted indices, and mention indices that cannot be mapped due to the NER changes."""
+    adjusted_mention_indices = []
+    error_indices = []
+    for mention_start, mention_end in mention_indices:
+        if valid_mapping(mention_start, mention_end, ne_indices):
+            adjusted_mention_indices.append((subtoken_map[mention_start], subtoken_map[mention_end]))
+        else:
+            error_indices.append((mention_start, mention_end))
+    return adjusted_mention_indices, error_indices
+
+
+def create_subtoken_map(tokens_len, indices):
     """
-    Adjusts mention indices after grouping named entities into single tokens.
-    Returns the adjusted indices, and mention indices that cannot be mapped due to the NER changes.
+    Creates subtoken map by grouping specified indices.
     """
-    error_mentions = []
-    curr_adj_mention_indices = mention_indices
-    for ne_start, ne_end in named_entity_indices:
-        new_adj_mention_indices = []
-        ne_length_factor = ne_end - ne_start
-        for mention_start, mention_end in curr_adj_mention_indices:
-            if mention_end < ne_start:  # No overlap, left
-                new_adj_mention_indices.append((mention_start, mention_end))
-            elif mention_start < ne_start <= mention_end <= ne_end:  # Partial overlap, left
-                new_adj_mention_indices.append((mention_start, ne_start))
-            elif mention_start == ne_start and mention_end == ne_end:  # Exact match
-                new_adj_mention_indices.append((ne_start, ne_start))
-            elif ne_start <= mention_start <= ne_end and ne_start <= mention_end <= ne_end:  # Partial or full nested
-                error_mentions.append((ne_start, ne_end))
-            elif ne_start <= mention_start <= ne_end < mention_end:  # Partial overlap, right
-                new_adj_mention_indices.append((ne_start, mention_end - ne_length_factor))
-            elif ne_end < mention_start:  # No overlap, right
-                new_adj_mention_indices.append((mention_start - ne_length_factor, mention_end - ne_length_factor))
-            elif mention_start < ne_start and ne_end < mention_end:  # Envelop
-                new_adj_mention_indices.append((mention_start, mention_end - ne_length_factor))
-            else:
-                error_msg = "Could not map at mention index={}, NE index={}, sentence index={}".format(
-                    (mention_start, mention_end), (ne_start, ne_end), sent_idx
-                )
-                raise ValueError(error_msg)
-        curr_adj_mention_indices = new_adj_mention_indices
-    return curr_adj_mention_indices, error_mentions
+    if len(indices) == 0:
+        return list(range(tokens_len))  # No entities, nothing to do
+
+    k = 0  # Tracks new tokens with named entities grouped
+    subtoken_map = {}
+    sorted_indices = indices.sort(key=lambda x: x[0])
+    curr_start, curr_end = sorted_indices[0]
+    for i in range(tokens_len):
+        if curr_start <= i <= curr_end:
+            subtoken_map[i] = k
+        else:
+            subtoken_map[i] = k
+            k += 1
+    return list(subtoken_map.values())
 
 
 def adjust_with_ner(mapped_outputs, use_gpu):
@@ -210,10 +219,12 @@ def adjust_with_ner(mapped_outputs, use_gpu):
     logging.info("Formatting output dictionary and adjusting indices")
     for i, (output, sent_entity_indices) in enumerate(zip(mapped_outputs, entity_indices)):
         if sent_entity_indices:
+
             output['ne_adjusted_words'] = adjust_ner_words(output['words'], sent_entity_indices)
-            adj_mention_indices, error_mention_indices = adjust_ner_mention_indices(output['clusters'], sent_entity_indices, i)
-            output['ne_adjusted_mention_indices'] = adj_mention_indices
-            output['ne_mention_error_indices'] = error_mention_indices
+            subtoken_map = create_subtoken_map(len(output['words']), sent_entity_indices)
+            adj_mention_idx, error_mention_idx = adjust_ner_mention_indices(output['clusters'], sent_entity_indices, subtoken_map)
+            output['ne_adjusted_mention_indices'] = adj_mention_idx
+            output['ne_mention_error_indices'] = error_mention_idx
         else:  # No named entities in this sentence.
             output['ne_adjusted_words'] = output['words']
             output['ne_adjusted_mention_indices'] = output['clusters']
@@ -247,9 +258,12 @@ def convert_bert_tokens(outputs):
                 mapped_outputs.append({'doc_key': output['doc_key'],
                                        'num_speakers': num_speakers(output['speakers']),
                                        'words': sent_so_far,
-                                       'clusters': adjust_cluster_indices(clusters, subtoken_map, sentence_start_idx, i - 1),
-                                       'predicted_clusters': adjust_cluster_indices(preds, subtoken_map, sentence_start_idx, i - 1),
-                                       'top_mentions': adjust_top_mentions(top_mentions, subtoken_map, sentence_start_idx, i - 1)})
+                                       'clusters': adjust_cluster_indices(clusters, subtoken_map, sentence_start_idx,
+                                                                          i - 1),
+                                       'predicted_clusters': adjust_cluster_indices(preds, subtoken_map,
+                                                                                    sentence_start_idx, i - 1),
+                                       'top_mentions': adjust_top_mentions(top_mentions, subtoken_map,
+                                                                           sentence_start_idx, i - 1)})
                 sent_so_far = []
                 sentence_start_idx = i
             elif i != 0 and subtoken_map[i - 1] != subtoken_map[i]:  # New word
