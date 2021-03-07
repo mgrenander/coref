@@ -186,7 +186,7 @@ def create_subtoken_map(tokens_len, indices):
     sorted_indices = sorted(indices, key=lambda x: x[0])
     curr_start, curr_end = sorted_indices[j]
     for i in range(tokens_len):
-        if i > curr_end:
+        if i > curr_end and j < len(sorted_indices) - 1:  # Move up to next named entity
             j += 1
             curr_start, curr_end = sorted_indices[j]
 
