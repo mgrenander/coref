@@ -181,10 +181,15 @@ def create_subtoken_map(tokens_len, indices):
         return list(range(tokens_len))  # No entities, nothing to do
 
     k = 0  # Tracks new tokens with named entities grouped
+    j = 0  # Tracks which named entity we are processing
     subtoken_map = {}
-    sorted_indices = indices.sort(key=lambda x: x[0])
-    curr_start, curr_end = sorted_indices[0]
+    sorted_indices = sorted(indices, key=lambda x: x[0])
+    curr_start, curr_end = sorted_indices[j]
     for i in range(tokens_len):
+        if i > curr_end:
+            j += 1
+            curr_start, curr_end = sorted_indices[j]
+
         if curr_start <= i <= curr_end:
             subtoken_map[i] = k
         else:
@@ -219,7 +224,6 @@ def adjust_with_ner(mapped_outputs, use_gpu):
     logging.info("Formatting output dictionary and adjusting indices")
     for i, (output, sent_entity_indices) in enumerate(zip(mapped_outputs, entity_indices)):
         if sent_entity_indices:
-
             output['ne_adjusted_words'] = adjust_ner_words(output['words'], sent_entity_indices)
             subtoken_map = create_subtoken_map(len(output['words']), sent_entity_indices)
             adj_mention_idx, error_mention_idx = adjust_ner_mention_indices(output['clusters'], sent_entity_indices, subtoken_map)
