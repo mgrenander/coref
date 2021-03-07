@@ -190,7 +190,7 @@ def create_subtoken_map(tokens_len, indices):
             j += 1
             curr_start, curr_end = sorted_indices[j]
 
-        if curr_start <= i <= curr_end:
+        if curr_start <= i < curr_end:
             subtoken_map[i] = k
         else:
             subtoken_map[i] = k
