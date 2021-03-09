@@ -323,7 +323,7 @@ if __name__ == "__main__":
     if args.na_file:
         add_na_spans(args.na_file, mapped_outputs)
 
-    if args.parser_preds != -1 or args.use_na_spans:
+    if args.parser_preds != -1 or args.na_file:
         with jsonlines.open("data/{}.parser.spanbert.jsonlines".format(args.dataset), mode='w') as w:
             for i, output in enumerate(mapped_outputs):
                 w.write(output)
