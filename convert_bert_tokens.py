@@ -267,8 +267,8 @@ def adjust_punctuation(mapped_outputs):
     for output in tqdm(mapped_outputs):
         words = output['words']
         adjusted_words = words.copy()
-        if '-' in words:
-            hyphenated_word_indices = find_hyphenated_word_indices(words)
+        hyphenated_word_indices = find_hyphenated_word_indices(words)
+        if hyphenated_word_indices:
             subtoken_map = create_subtoken_map(len(words), hyphenated_word_indices)
             adj_mention_idx, error_mention_idx = adjust_grouped_mention_indices(output['clusters'], hyphenated_word_indices, subtoken_map)
             output['punc_adjusted_mention_indices'] = adj_mention_idx
