@@ -15,6 +15,7 @@ def get_config():
     config_parser = argparse.ArgumentParser()
     config_parser.add_argument("--dataset", type=str, default='dev')
     config_parser.add_argument("--ner", action="store_true", help="use NER to group NE tokens")
+    config_parser.add_argument("--punc", action="store_true", help="use punctuation changes for hyphens and quotes")
     config_parser.add_argument("--parser_preds", type=int, default=0, help="attach parser preds with top-k categories")
     config_parser.add_argument("--na_file", type=str, default="", help="attach mentions not captured by parser")
     config_parser.add_argument("--use_gpu", action='store_true')
@@ -106,67 +107,47 @@ def add_na_spans(na_filename, mapped_outputs):
         raise ValueError("Cannot find NA spans at path: {}".format(na_file))
 
 
-def find_ner_indices(sents, ner_model):
-    """
-    Run NER model over a document and return list of list of tuples corresponding to entity index ranges for each sent.
-    """
-    sents = "\n".join(sents)
-    doc = ner_model(sents)
-    entity_indices = []
-    for sent in doc.sentences:
-        sent_entity_indices = []
-        ent_begin_idx = -1
-        for i, token in enumerate(sent.tokens):
-            # Ignore S and O tokens, since they will not be modified.
-            if token.ner[0] == "B":
-                ent_begin_idx = i
-            elif token.ner[0] == "E":
-                sent_entity_indices.append((ent_begin_idx, i))
-        entity_indices.append(sent_entity_indices)
-    return entity_indices
-
-
-def adjust_ner_words(words, named_entity_indices):
-    """Bunch together named entities with <NE> string and return updated token list."""
+def create_grouped_word_list(words, group_span_indices, join_string):
+    """Group together words with join_string string and return updated token list."""
     adjusted_words = []
-    curr_named_entity = []
-    ne_idx = 0
-    curr_ne_start_idx, curr_ne_end_idx = named_entity_indices[ne_idx]
+    curr_group = []
+    group_idx = 0
+    curr_group_start_idx, curr_group_end_idx = group_span_indices[group_idx]
     for i, token in enumerate(words):
-        if curr_ne_start_idx <= i <= curr_ne_end_idx:
-            curr_named_entity.append(token)
-            if i == curr_ne_end_idx:
-                adjusted_words.append("<NE>".join(curr_named_entity))
+        if curr_group_start_idx <= i <= curr_group_end_idx:
+            curr_group.append(token)
+            if i == curr_group_end_idx:
+                adjusted_words.append(join_string.join(curr_group))
 
                 # Update various indices
-                curr_named_entity = []
-                ne_idx += 1
-                if ne_idx < len(named_entity_indices):
-                    curr_ne_start_idx, curr_ne_end_idx = named_entity_indices[ne_idx]  # Track next NE
+                curr_group = []
+                group_idx += 1
+                if group_idx < len(group_span_indices):
+                    curr_group_start_idx, curr_group_end_idx = group_span_indices[group_idx]  # Track next group
                 else:
-                    curr_ne_start_idx, curr_ne_end_idx = len(words), len(words)  # Don't enter this block anymore
+                    curr_group_start_idx, curr_group_end_idx = len(words), len(words)  # Don't enter this block anymore
         else:
             adjusted_words.append(token)
     return adjusted_words
 
 
-def valid_mapping(mention_start, mention_end, ne_indices):
-    """Determine if the mention can be mapped under merging named entities."""
-    for ne_start, ne_end in ne_indices:
-        if mention_start == ne_start and mention_end == ne_end:  # Exact match
+def valid_mapping(mention_start, mention_end, group_indices):
+    """Determine if the mention can be mapped under merging rules."""
+    for group_start, group_end in group_indices:
+        if mention_start == group_start and mention_end == group_end:  # Exact match
             return True
-        elif ne_start <= mention_start <= ne_end and ne_start <= mention_end <= ne_end: # Partial or full nested
+        elif group_start <= mention_start <= group_end and group_start <= mention_end <= group_end: # Partial or full nested
             return False
     return True
 
 
-def adjust_ner_mention_indices(mention_indices, ne_indices, subtoken_map):
-    """Adjusts mention indices after grouping named entities into single tokens.
+def adjust_grouped_mention_indices(mention_indices, group_indices, subtoken_map):
+    """Adjusts mention indices after grouping certain indices into single tokens (e.g. named entities or hyphenated words).
     Returns the adjusted indices, and mention indices that cannot be mapped due to the NER changes."""
     adjusted_mention_indices = []
     error_indices = []
     for mention_start, mention_end in mention_indices:
-        if valid_mapping(mention_start, mention_end, ne_indices):
+        if valid_mapping(mention_start, mention_end, group_indices):
             adjusted_mention_indices.append((subtoken_map[mention_start], subtoken_map[mention_end]))
         else:
             error_indices.append((mention_start, mention_end))
@@ -198,6 +179,26 @@ def create_subtoken_map(tokens_len, indices):
     return list(subtoken_map.values())
 
 
+def find_ner_indices(sents, ner_model):
+    """
+    Run NER model over a document and return list of list of tuples corresponding to entity index ranges for each sent.
+    """
+    sents = "\n".join(sents)
+    doc = ner_model(sents)
+    entity_indices = []
+    for sent in doc.sentences:
+        sent_entity_indices = []
+        ent_begin_idx = -1
+        for i, token in enumerate(sent.tokens):
+            # Ignore S and O tokens, since they will not be modified.
+            if token.ner[0] == "B":
+                ent_begin_idx = i
+            elif token.ner[0] == "E":
+                sent_entity_indices.append((ent_begin_idx, i))
+        entity_indices.append(sent_entity_indices)
+    return entity_indices
+
+
 def adjust_with_ner(mapped_outputs, use_gpu):
     """
     Create new token lists with NE grouped together, adjust mention indices accordingly and compute resulting MD errors.
@@ -224,17 +225,73 @@ def adjust_with_ner(mapped_outputs, use_gpu):
     logging.info("Formatting output dictionary and adjusting indices")
     for i, (output, sent_entity_indices) in enumerate(zip(mapped_outputs, entity_indices)):
         if sent_entity_indices:
-            output['ne_adjusted_words'] = adjust_ner_words(output['words'], sent_entity_indices)
+            output['ne_adjusted_words'] = create_grouped_word_list(output['words'], sent_entity_indices, "<NE>")
             subtoken_map = create_subtoken_map(len(output['words']), sent_entity_indices)
-            adj_mention_idx, error_mention_idx = adjust_ner_mention_indices(output['clusters'], sent_entity_indices, subtoken_map)
+            adj_mention_idx, error_mention_idx = adjust_grouped_mention_indices(output['clusters'], sent_entity_indices, subtoken_map)
             output['ne_adjusted_mention_indices'] = adj_mention_idx
             output['ne_mention_error_indices'] = error_mention_idx
         else:  # No named entities in this sentence.
             output['ne_adjusted_words'] = output['words']
             output['ne_adjusted_mention_indices'] = output['clusters']
             output['ne_mention_error_indices'] = []
+    return mapped_outputs
 
-    # TODO: validate all outputs
+
+def find_hyphenated_word_indices(words):
+    """
+    Compute boundary indices for hyphenated words.
+    """
+    hyphen_simple_boundaries = [(i - 1, i + 1) for i, x in enumerate(words) if x == '-' and 0 < i < len(words) - 1]
+    merged_indices = []
+    j = 0
+    while j < len(hyphen_simple_boundaries):
+        curr_start, curr_end = hyphen_simple_boundaries[j]
+        continue_merge = j < len(hyphen_simple_boundaries) and curr_end == hyphen_simple_boundaries[j+1][0]
+        if not continue_merge:
+            j += 1
+        else:
+            while continue_merge:
+                curr_end = hyphen_simple_boundaries[j+1][1]
+                j += 1
+                continue_merge = j < len(hyphen_simple_boundaries) and curr_end == hyphen_simple_boundaries[j+1][0]
+        merged_indices.append((curr_start, curr_end))
+    return hyphen_simple_boundaries
+
+
+def adjust_punctuation(mapped_outputs):
+    """
+    Create new token lists with hyphenated words joined, adjust mention indices for these cases.
+    """
+    logging.info("Adjusting hyphen and quotation punctuation cases.")
+    start_quote = True  # Track open or closed directionless quotation marks
+    for output in tqdm(mapped_outputs):
+        words = output['words']
+        adjusted_words = words.copy()
+        if '-' in words:
+            hyphenated_word_indices = find_hyphenated_word_indices(words)
+            subtoken_map = create_subtoken_map(len(words), hyphenated_word_indices)
+            adj_mention_idx, error_mention_idx = adjust_grouped_mention_indices(output['clusters'], hyphenated_word_indices, subtoken_map)
+            output['punc_adjusted_mention_indices'] = adj_mention_idx
+            output['punc_mention_error_indices'] = error_mention_idx
+            adjusted_words = create_grouped_word_list(words, hyphenated_word_indices, "")
+        else:
+            output['punc_adjusted_mention_indices'] = output['clusters']
+            output['punc_mention_error_indices'] = []
+
+        # Adjust quotation marks
+        for quote_mark, parenthesis in zip(["``", "''"], ["(", ")"]):
+            if quote_mark in words:
+                indices = [i for i, x in enumerate(words) if x == quote_mark]
+                for idx in indices:
+                    adjusted_words[idx] = parenthesis
+
+        if '"' in words:
+            indices = [i for i, x in enumerate(words) if x == '"']
+            for idx in indices:
+                adjusted_words[idx] = '(' if start_quote else ')'
+                start_quote = not start_quote
+
+        output['punc_adjusted_words'] = adjusted_words
     return mapped_outputs
 
 
@@ -295,6 +352,9 @@ if __name__ == "__main__":
     if args.ner:
         mapped_outputs = adjust_with_ner(mapped_outputs, args.use_gpu)
         file_adj_prefix += "ner."
+    if args.punc:
+        mapped_outputs = adjust_punctuation(mapped_outputs)
+        file_adj_prefix += "punc."
 
     with jsonlines.open('data/{}.{}adjust_span_sents.jsonlines'.format(args.dataset, file_adj_prefix), mode='w') as w:
         for output in mapped_outputs:
@@ -304,6 +364,8 @@ if __name__ == "__main__":
         for output in mapped_outputs:
             if args.ner:
                 to_write = " ".join([str(idx) for span in output['ne_adjusted_mention_indices'] for idx in span])
+            elif args.punc:
+                to_write = " ".join([str(idx) for span in output['punc_adjusted_mention_indices'] for idx in span])
             else:
                 to_write = " ".join([str(idx) for span in output['clusters'] for idx in span])
             w.write(to_write + '\n')
@@ -312,6 +374,8 @@ if __name__ == "__main__":
         for output in mapped_outputs:
             if args.ner:
                 to_write = ' '.join(output['ne_adjusted_words']).strip()
+            elif args.punc:
+                to_write = ' '.join(output['punc_adjusted_words']).strip()
             else:
                 to_write = ' '.join(output['words']).strip()
             f.write(to_write + '\n')
