@@ -280,13 +280,13 @@ def adjust_punctuation(mapped_outputs):
 
         # Adjust quotation marks
         for quote_mark, parenthesis in zip(["``", "''"], ["(", ")"]):
-            if quote_mark in words:
-                indices = [i for i, x in enumerate(words) if x == quote_mark]
+            if quote_mark in adjusted_words:
+                indices = [i for i, x in enumerate(adjusted_words) if x == quote_mark]
                 for idx in indices:
                     adjusted_words[idx] = parenthesis
 
-        if '"' in words:
-            indices = [i for i, x in enumerate(words) if x == '"']
+        if '"' in adjusted_words:
+            indices = [i for i, x in enumerate(adjusted_words) if x == '"']
             for idx in indices:
                 adjusted_words[idx] = '(' if start_quote else ')'
                 start_quote = not start_quote
