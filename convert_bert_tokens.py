@@ -246,14 +246,14 @@ def find_hyphenated_word_indices(words):
     j = 0
     while j < len(hyphen_simple_boundaries):
         curr_start, curr_end = hyphen_simple_boundaries[j]
-        continue_merge = j < len(hyphen_simple_boundaries) and curr_end == hyphen_simple_boundaries[j+1][0]
+        continue_merge = j < len(hyphen_simple_boundaries) - 1 and curr_end == hyphen_simple_boundaries[j+1][0]
         if not continue_merge:
             j += 1
         else:
             while continue_merge:
                 curr_end = hyphen_simple_boundaries[j+1][1]
                 j += 1
-                continue_merge = j < len(hyphen_simple_boundaries) and curr_end == hyphen_simple_boundaries[j+1][0]
+                continue_merge = j < len(hyphen_simple_boundaries) - 1 and curr_end == hyphen_simple_boundaries[j+1][0]
         merged_indices.append((curr_start, curr_end))
     return hyphen_simple_boundaries
 
