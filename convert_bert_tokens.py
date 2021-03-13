@@ -267,6 +267,19 @@ def adjust_punctuation(mapped_outputs):
     for output in tqdm(mapped_outputs):
         words = output['words']
         adjusted_words = words.copy()
+
+        # Adjust quotation marks
+        for quote_mark, parenthesis in zip(["``", "''"], ["-LRB-", "-RRB-"]):
+            if quote_mark in adjusted_words:
+                indices = [i for i, x in enumerate(adjusted_words) if x == quote_mark]
+                for idx in indices:
+                    adjusted_words[idx] = parenthesis
+        if '"' in adjusted_words:
+            indices = [i for i, x in enumerate(adjusted_words) if x == '"']
+            for idx in indices:
+                adjusted_words[idx] = '(' if start_quote else ')'
+                start_quote = not start_quote
+
         hyphenated_word_indices = find_hyphenated_word_indices(words)
         if hyphenated_word_indices:
             subtoken_map = create_subtoken_map(len(words), hyphenated_word_indices)
@@ -277,19 +290,6 @@ def adjust_punctuation(mapped_outputs):
         else:
             output['punc_adjusted_mention_indices'] = output['clusters']
             output['punc_mention_error_indices'] = []
-
-        # Adjust quotation marks
-        for quote_mark, parenthesis in zip(["``", "''"], ["(", ")"]):
-            if quote_mark in adjusted_words:
-                indices = [i for i, x in enumerate(adjusted_words) if x == quote_mark]
-                for idx in indices:
-                    adjusted_words[idx] = parenthesis
-
-        if '"' in adjusted_words:
-            indices = [i for i, x in enumerate(adjusted_words) if x == '"']
-            for idx in indices:
-                adjusted_words[idx] = '(' if start_quote else ')'
-                start_quote = not start_quote
 
         output['punc_adjusted_words'] = adjusted_words
     return mapped_outputs
