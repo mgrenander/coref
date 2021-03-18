@@ -15,7 +15,8 @@ def get_config():
     config_parser = argparse.ArgumentParser()
     config_parser.add_argument("--dataset", type=str, default='dev')
     config_parser.add_argument("--ner", action="store_true", help="use NER to group NE tokens")
-    config_parser.add_argument("--punc", action="store_true", help="use punctuation changes for hyphens and quotes")
+    config_parser.add_argument("--punc_hyphen", action="store_true", help="join all hyphenated words")
+    config_parser.add_argument("--punc_strip_quotes", action="store_true", help="remove all quotes")
     config_parser.add_argument("--parser_preds", type=int, default=0, help="attach parser preds with top-k categories")
     config_parser.add_argument("--na_file", type=str, default="", help="attach mentions not captured by parser")
     config_parser.add_argument("--use_gpu", action='store_true')
@@ -258,40 +259,65 @@ def find_hyphenated_word_indices(words):
     return hyphen_simple_boundaries
 
 
+def find_quote_indices(words):
+    """
+    If start quote, group quote with word proceeding it.
+    If end quote, group quote with word preceding it.
+    Also handle directionless '"' quotes. NOTE: the way these quotes are handled assume that for every mention, the
+    sentence in which it occurs contains an even number of '"' quotes. If this is not the case, this method will break!
+    Return list of tuples indicating groups indices, i.e. the quote index and its predecessor/successor
+    """
+    quote_indices = []
+    start_quote = True
+    for i, word in enumerate(words):
+        if word == '``':
+            quote_indices.append((i, i+1))
+        elif word == "''":
+            quote_indices.append((i-1, i))
+        elif word == '"':
+            if i == len(words) - 1:
+                quote_indices.append((i-1, i))
+            elif i == 0:
+                quote_indices.append((i, i+1))
+            else:
+                quote_indices.append((i-1, i) if start_quote else (i, i+1))
+            start_quote = not start_quote
+    return quote_indices
+
+
 def adjust_punctuation(mapped_outputs):
     """
-    Create new token lists with hyphenated words joined, adjust mention indices for these cases.
+    Create new token lists with hyphenated words joined, strip out quotes and adjust mention indices for these cases.
     """
-    logging.info("Adjusting hyphen and quotation punctuation cases.")
-    start_quote = True  # Track open or closed directionless quotation marks
+    logging.info("Adjusting punctuation cases.")
     for output in tqdm(mapped_outputs):
         words = output['words']
-        adjusted_words = words.copy()
 
-        # Adjust quotation marks
-        for quote_mark, parenthesis in zip(["``", "''"], ["-LRB-", "-RRB-"]):
-            if quote_mark in adjusted_words:
-                indices = [i for i, x in enumerate(adjusted_words) if x == quote_mark]
-                for idx in indices:
-                    adjusted_words[idx] = parenthesis
-        if '"' in adjusted_words:
-            indices = [i for i, x in enumerate(adjusted_words) if x == '"']
-            for idx in indices:
-                adjusted_words[idx] = '(' if start_quote else ')'
-                start_quote = not start_quote
-
-        hyphenated_word_indices = find_hyphenated_word_indices(words)
-        if hyphenated_word_indices:
-            subtoken_map = create_subtoken_map(len(words), hyphenated_word_indices)
-            adj_mention_idx, error_mention_idx = adjust_grouped_mention_indices(output['clusters'], hyphenated_word_indices, subtoken_map)
+        # Quotation adjustments: strip out
+        quote_syms = ["``", "''", '"']
+        if any([quote_sym in words for quote_sym in quote_syms]):
+            quote_indices = find_quote_indices(words)
+            subtoken_map = create_subtoken_map(len(words), quote_indices)
+            adj_mention_idx, error_mention_idx = adjust_grouped_mention_indices(output['clusters'], quote_indices, subtoken_map)
             output['punc_adjusted_mention_indices'] = adj_mention_idx
             output['punc_mention_error_indices'] = error_mention_idx
-            adjusted_words = create_grouped_word_list(words, hyphenated_word_indices, "")
+            adjusted_words = [word for i, word in enumerate(words) if word not in quote_syms]
+        else:
+            adjusted_words = words.copy()
+
+        # Hyphen adjustments: join together.
+        hyphenated_word_indices = find_hyphenated_word_indices(adjusted_words)
+        if hyphenated_word_indices:
+            subtoken_map = create_subtoken_map(len(adjusted_words), hyphenated_word_indices)
+            adj_mention_idx, error_mention_idx = adjust_grouped_mention_indices(output['punc_adjusted_mention_indices'], hyphenated_word_indices, subtoken_map)
+            output['punc_adjusted_mention_indices'] = adj_mention_idx
+            output['punc_mention_error_indices'] = error_mention_idx
+            output['punc_adjusted_words'] = create_grouped_word_list(adjusted_words, hyphenated_word_indices, "")
         else:
             output['punc_adjusted_mention_indices'] = output['clusters']
             output['punc_mention_error_indices'] = []
+            output['punc_adjusted_words'] = adjusted_words
 
-        output['punc_adjusted_words'] = adjusted_words
     return mapped_outputs
 
 
