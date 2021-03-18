@@ -302,6 +302,8 @@ def adjust_punctuation(mapped_outputs):
             output['punc_mention_error_indices'] = error_mention_idx
             adjusted_words = [word for i, word in enumerate(words) if word not in quote_syms]
         else:
+            output['punc_adjusted_mention_indices'] = output['clusters']
+            output['punc_mention_error_indices'] = []
             adjusted_words = words.copy()
 
         # Hyphen adjustments: join together.
@@ -310,11 +312,9 @@ def adjust_punctuation(mapped_outputs):
             subtoken_map = create_subtoken_map(len(adjusted_words), hyphenated_word_indices)
             adj_mention_idx, error_mention_idx = adjust_grouped_mention_indices(output['punc_adjusted_mention_indices'], hyphenated_word_indices, subtoken_map)
             output['punc_adjusted_mention_indices'] = adj_mention_idx
-            output['punc_mention_error_indices'] = error_mention_idx
+            output['punc_mention_error_indices'] += error_mention_idx
             output['punc_adjusted_words'] = create_grouped_word_list(adjusted_words, hyphenated_word_indices, "")
         else:
-            output['punc_adjusted_mention_indices'] = output['clusters']
-            output['punc_mention_error_indices'] = []
             output['punc_adjusted_words'] = adjusted_words
 
     return mapped_outputs
