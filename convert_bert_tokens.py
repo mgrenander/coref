@@ -299,7 +299,7 @@ def adjust_punctuation(mapped_outputs):
             subtoken_map = create_subtoken_map(len(words), quote_indices)
             adj_mention_idx, error_mention_idx = adjust_grouped_mention_indices(output['clusters'], quote_indices, subtoken_map)
             output['punc_adjusted_mention_indices'] = adj_mention_idx
-            # output['punc_mention_error_indices'] = error_mention_idx  # These should be recoverable in post-processing
+            output['punc_mention_error_indices'] = []  # These should be recoverable in post-processing
             adjusted_words = [word for i, word in enumerate(words) if word not in quote_syms]
         else:
             output['punc_adjusted_mention_indices'] = output['clusters']
@@ -312,7 +312,7 @@ def adjust_punctuation(mapped_outputs):
             subtoken_map = create_subtoken_map(len(adjusted_words), hyphenated_word_indices)
             adj_mention_idx, error_mention_idx = adjust_grouped_mention_indices(output['punc_adjusted_mention_indices'], hyphenated_word_indices, subtoken_map)
             output['punc_adjusted_mention_indices'] = adj_mention_idx
-            output['punc_mention_error_indices'] += error_mention_idx
+            output['punc_mention_error_indices'] = error_mention_idx
             output['punc_adjusted_words'] = create_grouped_word_list(adjusted_words, hyphenated_word_indices, "")
         else:
             output['punc_adjusted_words'] = adjusted_words
