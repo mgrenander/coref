@@ -136,7 +136,11 @@ def valid_mapping(mention_start, mention_end, group_indices):
     for group_start, group_end in group_indices:
         if mention_start == group_start and mention_end == group_end:  # Exact match
             return True
-        elif group_start <= mention_start <= group_end and group_start <= mention_end <= group_end: # Partial or full nested
+        elif group_start <= mention_start <= group_end and group_start <= mention_end <= group_end:  # Partial or full nested
+            return False
+        elif mention_start < group_start <= mention_end < group_end:  # Partial overlap, left
+            return False
+        elif group_start < mention_start <= group_end < mention_end:  # Partial overlap, right
             return False
     return True
 
