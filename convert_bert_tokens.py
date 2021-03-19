@@ -237,25 +237,30 @@ def adjust_with_ner(mapped_outputs, use_gpu):
     return mapped_outputs
 
 
+def merge_index_boundaries(indices):
+    """
+    Auxiliary function to merge the boundaries of adjacent spans into continuous ones.
+    """
+    merged_indices = []
+    j = 0
+    while j < len(indices):
+        curr_start, curr_end = indices[j]
+        continue_merge = j < len(indices) - 1 and curr_end == indices[j + 1][0]
+        while continue_merge:
+            curr_end = indices[j + 1][1]
+            j += 1
+            continue_merge = j < len(indices) - 1 and curr_end == indices[j + 1][0]
+        j += 1
+        merged_indices.append((curr_start, curr_end))
+    return merged_indices
+
+
 def find_hyphenated_word_indices(words):
     """
     Compute boundary indices for hyphenated words.
     """
     hyphen_simple_boundaries = [(i - 1, i + 1) for i, x in enumerate(words) if x == '-' and 0 < i < len(words) - 1]
-    merged_indices = []
-    j = 0
-    while j < len(hyphen_simple_boundaries):
-        curr_start, curr_end = hyphen_simple_boundaries[j]
-        continue_merge = j < len(hyphen_simple_boundaries) - 1 and curr_end == hyphen_simple_boundaries[j+1][0]
-        if not continue_merge:
-            j += 1
-        else:
-            while continue_merge:
-                curr_end = hyphen_simple_boundaries[j+1][1]
-                j += 1
-                continue_merge = j < len(hyphen_simple_boundaries) - 1 and curr_end == hyphen_simple_boundaries[j+1][0]
-        merged_indices.append((curr_start, curr_end))
-    return hyphen_simple_boundaries
+    return merge_index_boundaries(hyphen_simple_boundaries)
 
 
 def find_quote_indices(words):
@@ -281,7 +286,7 @@ def find_quote_indices(words):
             else:
                 quote_indices.append((i-1, i) if start_quote else (i, i+1))
             start_quote = not start_quote
-    return quote_indices
+    return merge_index_boundaries(quote_indices)
 
 
 def adjust_punctuation(mapped_outputs):
