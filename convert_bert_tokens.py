@@ -18,6 +18,8 @@ def get_config():
     config_parser.add_argument("--punc", action="store_true", help="join all hyphenated words")
     config_parser.add_argument("--parser_preds", type=int, default=0, help="attach parser preds with top-k categories")
     config_parser.add_argument("--na_file", type=str, default="", help="attach mentions not captured by parser")
+    config_parser.add_argument("--reverse_map", action="store_true", help="create maps from parse tree to bert indices")
+    config_parser.add_argument("--max_segment_len", type=str, default="384", help="max segment length")
     config_parser.add_argument("--use_gpu", action='store_true')
     return config_parser.parse_args()
 
@@ -271,8 +273,8 @@ def find_quote_indices(words):
     """
     If start quote, group quote with word proceeding it.
     If end quote, group quote with word preceding it.
-    Also handle directionless '"' quotes. NOTE: the way these quotes are handled assume that for every mention, the
-    sentence in which it occurs contains an even number of '"' quotes. If this is not the case, this method will break!
+    Also handle directionless '"' quotes. NOTE: the method assumes there are an even number of '"' quotes.
+    If this is not the case, this method may not be correct.
     Return list of tuples indicating groups indices, i.e. the quote index and its predecessor/successor
     """
     quote_indices = []
@@ -353,12 +355,9 @@ def convert_bert_tokens(outputs):
                 mapped_outputs.append({'doc_key': output['doc_key'],
                                        'num_speakers': num_speakers(output['speakers']),
                                        'words': sent_so_far,
-                                       'clusters': adjust_cluster_indices(clusters, subtoken_map, sentence_start_idx,
-                                                                          i - 1),
-                                       'predicted_clusters': adjust_cluster_indices(preds, subtoken_map,
-                                                                                    sentence_start_idx, i - 1),
-                                       'top_mentions': adjust_top_mentions(top_mentions, subtoken_map,
-                                                                           sentence_start_idx, i - 1)})
+                                       'clusters': adjust_cluster_indices(clusters, subtoken_map, sentence_start_idx, i - 1),
+                                       'predicted_clusters': adjust_cluster_indices(preds, subtoken_map, sentence_start_idx, i - 1),
+                                       'top_mentions': adjust_top_mentions(top_mentions, subtoken_map, sentence_start_idx, i - 1)})
                 sent_so_far = []
                 sentence_start_idx = i
             elif i != 0 and subtoken_map[i - 1] != subtoken_map[i]:  # New word
@@ -373,11 +372,70 @@ def convert_bert_tokens(outputs):
     return mapped_outputs
 
 
+def combine_subtoken_maps(*subtoken_maps):
+    """
+    Create a single subtoken map from BERT to parser indices.
+    Auxiliary function that facilities easier reverse mapping.
+    """
+    combo_map_len = len(subtoken_maps[0])
+    combo_map = []
+    for i in range(combo_map_len):
+        idx = i
+        for submap in subtoken_maps:
+            idx = submap[idx]
+        combo_map.append(idx)
+    return combo_map
+
+
+def reverse_subtoken_map(subtoken_map):
+    """
+    Creates a map: idx --> (left_span_boundary, right_span_boundary) that effectively reverse the map created in
+    create_subtoken_map.
+    """
+    reverse_map = {}
+    for idx, mapped_val in enumerate(subtoken_map):
+        if mapped_val in reverse_map:
+            reverse_map[mapped_val] = (min(idx, reverse_map[mapped_val][0]), max(idx, reverse_map[mapped_val][1]))
+        else:
+            reverse_map[mapped_val] = (idx, idx)
+    return list(reverse_map.values())
+
+
+def create_reverse_map(outputs):
+    """
+    Creates a reverse map from parse tree indices to BERT indices for each document in the dataset.
+    """
+    tree_preprocess_docs = []
+    for doc in outputs:
+        # Create combined map
+        bert_subtoken_map = doc['subtoken_map']
+        penn_words = doc['tokens']
+        no_quote_words = create_grouped_word_list(penn_words, find_quote_indices(penn_words), "")
+        # parser_words = create_grouped_word_list(no_quote_words, find_hyphenated_word_indices(no_quote_words), "")
+
+        noquote_map = create_subtoken_map(len(penn_words), find_quote_indices(penn_words))
+        nohyphen_map = create_subtoken_map(len(no_quote_words), find_hyphenated_word_indices(no_quote_words))
+
+        combined_map = combine_subtoken_maps(bert_subtoken_map, noquote_map, nohyphen_map)
+
+        # Create reverse map
+        reverse_map = reverse_subtoken_map(combined_map)
+
+        tree_data = {
+            'doc_key': doc['doc_key'],
+            'bert': [tok for segment in doc['sentences'] for tok in segment],
+            'sentence_map': doc['sentence_map'],
+            'reverse_map': reverse_map
+        }
+        tree_preprocess_docs.append(tree_data)
+    return tree_preprocess_docs
+
+
 if __name__ == "__main__":
     logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
     args = get_config()
     outputs = []
-    with jsonlines.open("data/{}.output.english.512.jsonlines".format(args.dataset)) as reader:
+    with jsonlines.open("data/{}.output.english.{}.jsonlines".format(args.dataset, args.max_segment_len)) as reader:
         for line in reader:
             outputs.append(line)
 
@@ -389,6 +447,13 @@ if __name__ == "__main__":
     if args.punc:
         mapped_outputs = adjust_punctuation(mapped_outputs)
         file_adj_prefix += "punc."
+
+    if args.reverse_map:
+        reverse_map = create_reverse_map(outputs)
+        reverse_map_name = "data/{}.reverse_map.{}.jsonlines".format(args.dataset, args.max_segment_len)
+        with jsonlines.open(reverse_map_name, mode='w') as w:
+            for output in reverse_map:
+                w.write(output)
 
     with jsonlines.open('data/{}.{}adjust_span_sents.jsonlines'.format(args.dataset, file_adj_prefix), mode='w') as w:
         for output in mapped_outputs:
