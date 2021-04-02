@@ -15,10 +15,10 @@ JPype1==0.6.2
 Keras-Applications==1.0.8
 Keras-Preprocessing==1.1.0
 Markdown==3.1.1
-MarkupSafe
+MarkupSafe==1.1.1
 mmh3==2.5.1
 msgpack-python==0.5.4
-numpy
+numpy==1.17.0
 Pillow==6.1.0
 protobuf==3.9.1
 psycopg2==2.7.4
@@ -30,8 +30,8 @@ PyStanfordDependencies==0.3.1
 python-dateutil==2.6.1
 pytz==2017.3
 s3transfer==0.1.13
-scikit-learn
-scipy
+scikit-learn==0.22.2
+scipy==1.0.0
 six==1.12.0
 tensorboard==1.14.0
 tensorflow-estimator==1.14.0
