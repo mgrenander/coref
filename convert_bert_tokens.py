@@ -346,8 +346,8 @@ def convert_bert_tokens(outputs):
         sentence_map = output['sentence_map']
         subtoken_map = output['subtoken_map']
         clusters = output['clusters']
-        preds = output['predicted_clusters']
-        top_mentions = output['top_spans']
+        # preds = output['predicted_clusters']
+        # top_mentions = output['top_spans']
         for i, subword in enumerate(comb_text):
             if i != 0 and sentence_map[i - 1] != sentence_map[i]:  # New sentence
                 sent_so_far.append(convert_bert_word(''.join(word_so_far)))
@@ -355,9 +355,10 @@ def convert_bert_tokens(outputs):
                 mapped_outputs.append({'doc_key': output['doc_key'],
                                        'num_speakers': num_speakers(output['speakers']),
                                        'words': sent_so_far,
-                                       'clusters': adjust_cluster_indices(clusters, subtoken_map, sentence_start_idx, i - 1),
-                                       'predicted_clusters': adjust_cluster_indices(preds, subtoken_map, sentence_start_idx, i - 1),
-                                       'top_mentions': adjust_top_mentions(top_mentions, subtoken_map, sentence_start_idx, i - 1)})
+                                       'clusters': adjust_cluster_indices(clusters, subtoken_map, sentence_start_idx, i - 1)
+                                       # 'predicted_clusters': adjust_cluster_indices(preds, subtoken_map, sentence_start_idx, i - 1),
+                                       # 'top_mentions': adjust_top_mentions(top_mentions, subtoken_map, sentence_start_idx, i - 1)
+                                       })
                 sent_so_far = []
                 sentence_start_idx = i
             elif i != 0 and subtoken_map[i - 1] != subtoken_map[i]:  # New word
@@ -435,7 +436,7 @@ if __name__ == "__main__":
     logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
     args = get_config()
     outputs = []
-    with jsonlines.open("data/{}.output.english.{}.jsonlines".format(args.dataset, args.max_segment_len)) as reader:
+    with jsonlines.open("data/{}.english.{}.jsonlines".format(args.dataset, args.max_segment_len)) as reader:
         for line in reader:
             outputs.append(line)
 
